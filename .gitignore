@@ -6,6 +6,8 @@ misc/Unity2D-Characters-FullProject/
 # Dev-only (not needed to play in browser)
 docs/
 .cursor/
+!.cursor/rules/
+!.cursor/rules/**
 terminals/
 *.log
 
