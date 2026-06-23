@@ -982,21 +982,31 @@ function update(){
     else p.vy=Math.min(p.vy+(isJump()&&p.jf>0&&p.vy<0?GRAV*0.38:GRAV),14);
     if(!_playerOnGround(p)&&p.hook.st!=='on'&&p.wallGrip<=0) p._peakVy=Math.max(p._peakVy||0,p.vy);
     _movePlayerWithColl(p,p.vx,p.vy);
-    const _moveDir=_moveInputX();
-    if(_moveDir&&_playerOnGround(p)){
+    const _moveRaw=_moveInputX();
+    const _moveSign=_moveRaw>0.05?1:(_moveRaw<-0.05?-1:0);
+    if(_moveSign&&_playerOnGround(p)){
       const _moved=Math.abs(p.x-p._ux0);
       const _vx=Math.abs(p.vx||0);
       const _blocked=_vx>0.35&&_moved<_vx*0.22;
       if(_blocked){
-        if(typeof _cornerStepResolve==='function'&&_cornerStepResolve(p)) p._moveBlocked=false;
+        const onBox=typeof _onOmniblockTop==='function'&&_onOmniblockTop(p);
+        if(onBox){
+          if(typeof _cornerStepResolve==='function'&&_cornerStepResolve(p)){
+            p._moveBlocked=false; p._grindF=0;
+          }else{
+            p._moveBlocked=false;
+            p._grindF=0;
+            p.vx*=0.9;
+          }
+        }else if(typeof _cornerStepResolve==='function'&&_cornerStepResolve(p)) p._moveBlocked=false;
         else{
           p.vx=0;
           p._moveBlocked=true;
           const _wt=_wallTouchInfo(p);
-          if(!(_wt.touch&&_wt.dir===_moveDir)) p._grindF=Math.min(12,(p._grindF||0)+1);
+          if(!(_wt.touch&&_wt.dir===_moveSign)) p._grindF=Math.min(12,(p._grindF||0)+1);
         }
       }else if(_moved>=Math.max(1.2,_vx*0.45)){ p._grindF=0; p._moveBlocked=false; }
-    }else if(!_moveDir) p._moveBlocked=false;
+    }else if(!_moveSign) p._moveBlocked=false;
   }else if(p.hook.st!=='on'&&p.wallGrip>0){ _movePlayerWithColl(p,p.vx,p.vy); }
   if(p.y<20){p.y=20;p.vy=Math.max(0,p.vy);}
   p.x=Math.max(0,Math.min(WW-SW,p.x));

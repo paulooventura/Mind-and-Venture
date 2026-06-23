@@ -13,7 +13,7 @@
 
 // ── Movement constants ────────────────────────────────────────
 const GRAV=0.52, FRIC=0.88, GROUND_FRIC=0.52, RUN_COAST_FRIC=0.86, AIR_DRIFT=0.96;
-const MOVE_BUILD=41;
+const MOVE_BUILD=42;
 const MOVE_WALK=10.5;
 const MOVE_PEAK=1.0;
 const MOVE_RUN=16.5;
@@ -412,19 +412,50 @@ function _tileGrassSegUsable(seg){
   if(seg.col==null||seg.row==null) return true;
   return !_bwallOwnsTileCell(seg.col,seg.row);
 }
+// Mario rule: omniblock top is a walkable platform; sides only block when feet are beside the face.
+function _feetOnBwallTopPlane(pl,bw,seam){
+  if(!pl||!bw||bw.hp<=0) return false;
+  const feet=pl.y+FEET_OFF;
+  const fL=pl.x+FEET_L, fR=fL+FEET_W;
+  const s=seam!=null?seam:24;
+  return _feetSpanOver(bw,fL,fR,s)&&feet>=bw.y-14&&feet<=bw.y+16;
+}
+function _onOmniblockTop(pl){
+  if(!pl) return false;
+  if(_ridingBwallTop(pl)) return true;
+  for(const bw of BWALLS){
+    if(_feetOnBwallTopPlane(pl,bw,24)) return true;
+  }
+  return false;
+}
+function _omniblockLedgeSlide(pl,input){
+  if(!input||!_onOmniblockTop(pl)) return false;
+  const x0=pl.x, y0=pl.y;
+  for(const step of [3,5,8,12,16]){
+    pl.x=x0+input*step;
+    resolveBodyX(pl);
+    const prevFeet=y0+FEET_OFF;
+    resolvePlatY(pl,prevFeet);
+    if(Math.abs(pl.x-x0)>=1.5&&_onOmniblockTop(pl)){
+      pl._groundHold=Math.max(pl._groundHold||0,4);
+      return true;
+    }
+    pl.x=x0; pl.y=y0;
+  }
+  return false;
+}
 // Bwall AABB top is plat.y; bottom is plat.y+plat.h. Skip side shove when feet are on top or floor lip.
 function _bwallFeetSideClear(pl,plat,fL,fR,feet){
   if(!plat||!plat.bw||!pl) return false;
   if(pl===p&&typeof isPunch==='function'&&isPunch()) return true;
-  if(_playerStandingOnPlat(pl,plat)) return true;
-  if(feet>=plat.y-14&&feet<=plat.y+GROUND_SINK_MAX+12&&_feetSpanOver(plat,fL,fR,10)) return true;
-  const lip=plat.y+plat.h;
-  if(Math.abs(feet-lip)<=GROUND_SINK_MAX+10&&_feetSpanOver(plat,fL,fR,10)){
-    const h=playerCoreHB(pl);
-    const penL=(h.x+h.w)-plat.x, penR=(plat.x+plat.w)-h.x;
-    const xPen=Math.min(Math.max(0,penL),Math.max(0,penR));
-    if(xPen<=18) return true;
+  if(_feetOnBwallTopPlane(pl,plat,26)) return true;
+  const top=plat.y;
+  for(const bw of BWALLS){
+    if(!bw||bw.hp<=0||Math.abs(bw.y-top)>8) continue;
+    if(_feetOnBwallTopPlane(pl,bw,26)) return true;
   }
+  if(feet>top+10) return false;
+  if(_playerStandingOnPlat(pl,plat)) return true;
   return false;
 }
 // KEEP OUT vertical barriers duplicate omniblock faces — resolve one authority only.
@@ -850,6 +881,7 @@ function _applySlopePhysics(pl){
 function _wheelEdgeRoll(pl){
   if(!pl||!pl.og) return;
   if(_ridingBwallTop(pl)) return;
+  if(_onOmniblockTop(pl)) return;
   if(pl.hook&&pl.hook.st==='on') return;
   if(pl._onSlope) return;
   if((pl._groundHold||0)>0) return;
@@ -1055,8 +1087,8 @@ function _playerRidingBoxTop(pl,box){
   if(!pl||!box) return false;
   const feet=pl.y+FEET_OFF;
   const fL=pl.x+FEET_L, fR=fL+FEET_W;
-  if(!_feetSpanOver(box,fL,fR,16)) return false;
-  return feet>=box.y-10&&feet<=box.y+16;
+  if(!_feetSpanOver(box,fL,fR,20)) return false;
+  return feet>=box.y-12&&feet<=box.y+16;
 }
 function _playerOnSolidTop(pl,box){
   return _playerRidingBoxTop(pl,box);
@@ -1352,7 +1384,9 @@ function _pushGrindBlocked(pl){
 }
 function _syncPushGrind(pl){
   if(!pl||pl!==p) return;
-  const dir=typeof _moveInputX==='function'?_moveInputX():0;
+  if(_onOmniblockTop(pl)){ pl._grindF=0; return; }
+  const dirRaw=typeof _moveInputX==='function'?_moveInputX():0;
+  const dir=Math.abs(dirRaw)<0.05?0:(dirRaw>0?1:-1);
   if(!dir||!pl.og){ pl._grindF=0; return; }
   const ux=pl._ux0;
   if(ux==null){ pl._grindF=0; return; }
@@ -1396,8 +1430,10 @@ function _haltVelocityAtContacts(pl){
 function _cornerStepResolve(pl){
   if(!pl||pl.hook&&pl.hook.st==='on'||pl.wallGrip>0) return false;
   if(!_playerOnGround(pl)) return false;
-  const input=pl===p&&typeof _moveInputX==='function'?_moveInputX():0;
+  const inputRaw=pl===p&&typeof _moveInputX==='function'?_moveInputX():0;
+  const input=Math.abs(inputRaw)<0.05?0:(inputRaw>0?1:-1);
   if(!input) return false;
+  if(_onOmniblockTop(pl)&&_omniblockLedgeSlide(pl,input)) return true;
   const wt=_wallTouchInfo(pl);
   const stalled=(pl._grindF||0)>=2;
   const blockedIntoWall=wt.touch&&wt.dir===input;
@@ -2401,10 +2437,12 @@ function _wallTouchInfo(pl){
   }
   if(!touch){
     const cx=pl.x+SW*0.5;
+    const feet=pl.y+FEET_OFF;
     for(const plat of allP()){
       if(plat.tp!=='solid') continue;
       if(_isWorldBoundPlat(plat)) continue;
       if(!_platNearX(plat,cx,SW+24)) continue;
+      if(plat.bw&&_feetOnBwallTopPlane(pl,plat,22)) continue;
       if(bodyB<=plat.y+8||bodyT>=plat.y+plat.h-8) continue;
       if(bodyL<=plat.x+plat.w+nearPad&&bodyL>=plat.x+plat.w-deepPad){touch=true;dir=-1;break;}
       if(bodyR>=plat.x-nearPad&&bodyR<=plat.x+deepPad){touch=true;dir=1;break;}
