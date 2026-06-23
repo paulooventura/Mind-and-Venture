@@ -23,7 +23,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Mind &amp; Venture</title>
-<script>window.MV_BUILD='95';</script>
+<script>window.MV_BUILD='96';</script>
 <script>
 if(location.protocol==='file:'){
   document.addEventListener('DOMContentLoaded',function(){
@@ -43,14 +43,76 @@ canvas{image-rendering:auto;
   image-rendering:-moz-crisp-edges;image-rendering:-webkit-optimize-contrast;
   -ms-interpolation-mode:nearest-neighbor;max-width:100%;width:100%;height:auto;
   border:1px solid #1a1a30;cursor:crosshair;touch-action:none;}
-.row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
-button{background:#111122;color:#666;border:1px solid #222;padding:5px 10px;
-  border-radius:4px;font:9px monospace;cursor:pointer;touch-action:none;user-select:none;}
-.dpad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(2,30px);gap:2px;}
+/* ── Switch-style on-screen controller ── */
+#gamepad{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  width:min(100%,560px);max-width:100%;
+  padding:14px 18px 18px;margin-top:4px;
+  background:linear-gradient(180deg,#3d3d48 0%,#252530 55%,#1c1c26 100%);
+  border-radius:32px 32px 40px 40px;
+  border:2px solid #4a4a58;
+  box-shadow:0 10px 28px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1);
+  touch-action:none;user-select:none;gap:6px;
+}
+.gp-grip{flex:1;display:flex;align-items:center;min-width:0;}
+.gp-left{justify-content:flex-start;padding-left:4px;}
+.gp-right{justify-content:flex-end;padding-right:4px;}
+.gp-center{display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:center;padding-bottom:6px;}
+.gp-util{
+  background:#1a1a24;color:#6a8;border:1px solid #3a3a48;
+  border-radius:10px;padding:5px 10px;font:bold 9px monospace;
+  cursor:pointer;touch-action:none;user-select:none;
+  box-shadow:0 2px 0 #0a0a12,inset 0 1px 0 rgba(255,255,255,.06);
+}
+.gp-util:active{transform:translateY(1px);box-shadow:0 1px 0 #0a0a12;}
+#bTest{color:#6f6;background:#0a1a0a;border-color:#1a4a1a;}
+#bRst{color:#fc6;background:#1a1408;border-color:#4a3a10;}
+/* D-pad (left Joy-Con) */
+.dpad{position:relative;width:116px;height:116px;flex-shrink:0;}
+.dpad-btn{
+  position:absolute;width:38px;height:38px;border:none;border-radius:9px;
+  background:linear-gradient(160deg,#565668,#32323e);
+  color:#dde;font-size:15px;line-height:1;font-weight:700;
+  cursor:pointer;touch-action:none;user-select:none;
+  box-shadow:0 4px 0 #181820,inset 0 1px 0 rgba(255,255,255,.14);
+}
+.dpad-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #181820;}
+.dpad-up{top:0;left:39px;}
+.dpad-down{bottom:0;left:39px;}
+.dpad-left{top:39px;left:0;}
+.dpad-right{top:39px;right:0;}
+.dpad::after{
+  content:'';position:absolute;top:39px;left:39px;width:38px;height:38px;
+  background:radial-gradient(circle at 40% 35%,#3a3a48,#22222c);
+  border-radius:8px;pointer-events:none;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.35);
+}
+/* Face buttons (right Joy-Con diamond) */
+.face-buttons{position:relative;width:120px;height:120px;flex-shrink:0;}
+.face{
+  position:absolute;width:46px;height:46px;border:none;border-radius:50%;
+  font:bold 10px/1.1 monospace;cursor:pointer;touch-action:none;user-select:none;
+  box-shadow:0 5px 0 rgba(0,0,0,.38),inset 0 2px 5px rgba(255,255,255,.28);
+  text-shadow:0 1px 1px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.face:active{transform:translateY(2px);box-shadow:0 3px 0 rgba(0,0,0,.38);}
+.face-top{top:0;left:37px;background:linear-gradient(145deg,#6ed4ff,#2a9fd4);color:#023;}
+.face-right{top:37px;right:0;background:linear-gradient(145deg,#ff7070,#d03040);color:#300;}
+.face-bottom{bottom:0;left:37px;background:linear-gradient(145deg,#ffe060,#d0a010);color:#320;}
+.face-left{top:37px;left:0;background:linear-gradient(145deg,#88ee88,#40b040);color:#030;}
+.face-lbl{display:block;font-size:8px;opacity:.85;margin-top:1px;}
 @media (max-width:1100px){
   body{padding:4px;gap:3px;}
-  button{padding:8px 12px;font-size:11px;min-height:44px;}
-  .dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);}
+  #gamepad{padding:16px 20px 20px;border-radius:36px 36px 44px 44px;}
+  .dpad{width:132px;height:132px;}
+  .dpad-btn{width:44px;height:44px;font-size:17px;}
+  .dpad-up{left:44px;}.dpad-down{left:44px;}.dpad-left{top:44px;}.dpad-right{top:44px;}
+  .dpad::after{top:44px;left:44px;width:44px;height:44px;}
+  .face-buttons{width:136px;height:136px;}
+  .face{width:52px;height:52px;font-size:11px;}
+  .face-top{left:42px;}.face-bottom{left:42px;}.face-left,.face-right{top:42px;}
+  .gp-util{padding:8px 12px;font-size:10px;min-height:36px;}
 }
 @media (display-mode:standalone){
   body{padding:2px;gap:2px;}
@@ -67,7 +129,7 @@ button{background:#111122;color:#666;border:1px solid #222;padding:5px 10px;
 </style>
 </head>
 <body>
-<div id="mvVer" style="font-size:13px;color:#6f6;font-weight:bold;font-family:monospace;margin:4px 0">Mind &amp; Venture · Awdjoo · build 95</div>
+<div id="mvVer" style="font-size:13px;color:#6f6;font-weight:bold;font-family:monospace;margin:4px 0">Mind &amp; Venture · Awdjoo · build 96</div>
 <div id="battleHud">
   <div class="bh-title">BATTLE PRACTICE</div>
   <div class="bh-row">
@@ -81,20 +143,30 @@ button{background:#111122;color:#666;border:1px solid #222;padding:5px 10px;
 <canvas id="c" width="1024" height="768"></canvas>
 </div>
 <div id="inf" style="font-size:10px;color:#0f0;min-height:16px;word-break:break-all;"></div>
-<div class="row">
-  <div class="dpad">
-    <div></div><button id="bU">W↑</button><div></div>
-    <button id="bL">A←</button><button id="bDn">S↓</button><button id="bR">D→</button>
+<div id="gamepad">
+  <div class="gp-grip gp-left">
+    <div class="dpad">
+      <button id="bU" class="dpad-btn dpad-up" aria-label="Up">▲</button>
+      <button id="bL" class="dpad-btn dpad-left" aria-label="Left">◀</button>
+      <button id="bDn" class="dpad-btn dpad-down" aria-label="Down">▼</button>
+      <button id="bR" class="dpad-btn dpad-right" aria-label="Right">▶</button>
+    </div>
   </div>
-  <button id="bSp" style="height:30px;padding:0 12px;font-weight:700;">SPACE</button>
-  <button id="bE" style="height:30px;padding:0 10px;color:#0ff;">E</button>
-  <button id="bQ" style="height:30px;padding:0 10px;color:#f90;">Q</button>
-  <button id="bF" style="height:30px;padding:0 10px;color:#f66;">F</button>
-  <button id="bTest" style="height:30px;padding:0 12px;color:#0f0;background:#001800;border-color:#0a4400;font-weight:700;">🔬 TEST</button>
-  <button id="bRst" style="height:30px;padding:0 12px;font-weight:700;color:#ff0;background:#221100;border-color:#554400;">↺ RESET</button>
+  <div class="gp-center">
+    <button id="bTest" class="gp-util" type="button">🔬 TEST</button>
+    <button id="bRst" class="gp-util" type="button">↺ RESET</button>
+  </div>
+  <div class="gp-grip gp-right">
+    <div class="face-buttons">
+      <button id="bSp" class="face face-top" type="button" aria-label="Jump">JUMP<span class="face-lbl">space</span></button>
+      <button id="bQ" class="face face-left" type="button" aria-label="Swap item">SWAP<span class="face-lbl">Q</span></button>
+      <button id="bF" class="face face-right" type="button" aria-label="Punch">PUNCH<span class="face-lbl">F</span></button>
+      <button id="bE" class="face face-bottom" type="button" aria-label="Use item">USE<span class="face-lbl">E</span></button>
+    </div>
+  </div>
 </div>
-<p style="font-size:8px;color:#222;margin-top:2px;">
-  WASD/Arrows move+aim · Space jump · S duck · E use item · Q swap · F punch · Tab reset
+<p style="font-size:8px;color:#333;margin-top:4px;text-align:center;">
+  D-pad move · Jump · Duck on D-pad ↓ · Face buttons: use / swap / punch
 </p>
 <script>
 window.onerror=function(msg,src,line,col,err){
@@ -129,7 +201,7 @@ window.onerror=function(msg,src,line,col,err){
 <script>
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.addEventListener('load',function(){
-    var SW_BUILD='95';
+    var SW_BUILD='96';
     if(/[?&](selftest|ci)=/i.test(location.search)) return;
     var stored=localStorage.getItem('mv_sw_build');
     if(stored!==SW_BUILD||window.MV_BUILD!==SW_BUILD){
