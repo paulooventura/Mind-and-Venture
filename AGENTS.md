@@ -32,6 +32,11 @@ whole tree to "see what's up" — use this map.
 - `js/player.js` `_updatePlayerMoveX`: turn-slash, accel curve, cap easing.
 - Collision/anti-stick gates (`_moveBlocked`, `_grindF`, `_cornerStepResolve`,
   `_wallTouchInfo`) are in `physics.js` — keep them; tune *velocity*, not collision.
+- **SMW solid rules** (`physics.js`): `_marioOnTop`, `_marioSkipSide`, `_marioResolveSideX`,
+  `_marioSnapWalkTop`, `_marioBonkCeiling` — one model for omniblocks, tile boxes, crates.
+  TOP = walk · SIDE = wall when feet beside face · BOTTOM = ceiling · GONE = `hp<=0`.
+- **KEEP OUT vs omniblocks**: Tiled `KEEP OUT!` hull traces block columns (duplicate faces).
+  `_marioSkipKeepOut` suppresses those barrier segments when feet are on the block top.
 
 ## Automated QA (use this — do NOT ask the user to paste reports)
 

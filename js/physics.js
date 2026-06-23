@@ -13,7 +13,7 @@
 
 // ── Movement constants ────────────────────────────────────────
 const GRAV=0.52, FRIC=0.88, GROUND_FRIC=0.52, RUN_COAST_FRIC=0.86, AIR_DRIFT=0.96;
-const MOVE_BUILD=42;
+const MOVE_BUILD=44;
 const MOVE_WALK=10.5;
 const MOVE_PEAK=1.0;
 const MOVE_RUN=16.5;
@@ -88,6 +88,10 @@ const COLL_MOVE_STEP=4;
 const COLL_LEDGE_STEP=56;
 const GROUND_SINK_MAX=2;
 const LAND_FEET_TOL=6;
+// SMW solid rules (omniblocks, tile boxes, crates share one model):
+// TOP = walkable platform · SIDE = wall only when feet are beside the face
+// BOTTOM = head bonk when rising · GONE = destroyed omniblocks are air
+const MARIO_TOP_LO=14, MARIO_TOP_HI=16, MARIO_SIDE_FACE=10, MARIO_SEAM=26;
 const ZONE_WALL_THICK=28;
 let COLL_SEGS=[];
 let COLL_WALL_SEGS=[];
@@ -412,31 +416,91 @@ function _tileGrassSegUsable(seg){
   if(seg.col==null||seg.row==null) return true;
   return !_bwallOwnsTileCell(seg.col,seg.row);
 }
-// Mario rule: omniblock top is a walkable platform; sides only block when feet are beside the face.
-function _feetOnBwallTopPlane(pl,bw,seam){
-  if(!pl||!bw||bw.hp<=0) return false;
+// ── SMW solid collision (single rule set for map solids) ───────
+function _marioGone(box){ return !!(box&&box.hp!=null&&box.hp<=0); }
+function _marioOnTop(pl,box,seam){
+  if(!pl||!box||_marioGone(box)) return false;
   const feet=pl.y+FEET_OFF;
   const fL=pl.x+FEET_L, fR=fL+FEET_W;
-  const s=seam!=null?seam:24;
-  return _feetSpanOver(bw,fL,fR,s)&&feet>=bw.y-14&&feet<=bw.y+16;
+  const s=seam!=null?seam:MARIO_SEAM;
+  return _feetSpanOver(box,fL,fR,s)&&feet>=box.y-MARIO_TOP_LO&&feet<=box.y+MARIO_TOP_HI;
 }
-function _onOmniblockTop(pl){
+function _marioOnAnyTop(pl){
   if(!pl) return false;
-  if(_ridingBwallTop(pl)) return true;
-  for(const bw of BWALLS){
-    if(_feetOnBwallTopPlane(pl,bw,24)) return true;
+  for(const bw of BWALLS){ if(_marioOnTop(pl,bw)) return true; }
+  for(const plat of allP()){
+    if(plat.tp!=='solid'||plat.poly) continue;
+    if(_marioOnTop(pl,plat)) return true;
   }
   return false;
 }
-function _omniblockLedgeSlide(pl,input){
-  if(!input||!_onOmniblockTop(pl)) return false;
+function _marioSkipSide(pl,box){
+  if(!pl||!box||_marioGone(box)) return true;
+  if(pl===p&&typeof isPunch==='function'&&isPunch()) return true;
+  if(_marioOnTop(pl,box)) return true;
+  const top=box.y;
+  for(const bw of BWALLS){
+    if(_marioGone(bw)||Math.abs(bw.y-top)>8) continue;
+    if(_marioOnTop(pl,bw)) return true;
+  }
+  const feet=pl.y+FEET_OFF;
+  if(feet>top+MARIO_SIDE_FACE) return false;
+  return _playerStandingOnPlat(pl,box);
+}
+function _marioResolveSideX(pl,box){
+  if(!pl||!box||_marioGone(box)) return false;
+  if(box.tp&&box.tp!=='solid') return false;
+  if(_marioSkipSide(pl,box)) return false;
+  if(_isWorldBoundPlat(box)) return false;
+  if(!box.bw&&_platSideCollisionSkip(pl,box)) return false;
+  const h=playerCoreHB(pl);
+  if(!ov(h.x,h.y,h.w,h.h,box.x,box.y,box.w,box.h)) return false;
+  const penL=(h.x+h.w)-box.x, penR=(box.x+box.w)-h.x;
+  if(penL<=0||penR<=0) return false;
+  if(penL<=penR){ pl.x-=penL+COLL_CONTACT_GAP; if((pl.vx||0)>0) pl.vx=0; }
+  else{ pl.x+=penR+COLL_CONTACT_GAP; if((pl.vx||0)<0) pl.vx=0; }
+  return true;
+}
+function _marioSnapWalkTop(pl,box){
+  if(!pl||!box||_marioGone(box)) return false;
+  const feet=pl.y+FEET_OFF;
+  const fL=pl.x+FEET_L, fR=fL+FEET_W;
+  const cx=pl.x+SW*0.5;
+  if(!_feetSpanOver(box,fL,fR,22)) return false;
+  if(box.bw&&!_bwallCenterSupports(cx,box)) return false;
+  if(cx<box.x+4||cx>box.x+box.w-4) return false;
+  if(!_feetCanLandOn(feet,pl._prevLandFeet,box.y)) return false;
+  if(feet>box.y+GROUND_SINK_MAX+2) pl.y=box.y-FEET_OFF;
+  pl.og=true;
+  if(pl.vy>0) pl.vy=0;
+  return true;
+}
+function _marioBonkCeiling(pl,box){
+  if(!pl||pl.vy>=0||_marioGone(box)) return false;
+  const head=playerHeadWorld(pl);
+  if(_useBodyCeilCollider(pl)){
+    const body=playerCoreHB(pl);
+    if(body.x+body.w<=box.x||body.x>=box.x+box.w) return false;
+    const ceilB=box.y+box.h, bTop=body.y;
+    if(bTop<ceilB&&bTop+body.h>box.y){
+      pl.y+=ceilB-bTop; pl.vy=0;
+      pl._autoHeadTuck=Math.min(1,Math.max(pl._autoHeadTuck||0,0.9));
+      return true;
+    }
+  }else if(_circleRectOverlap(head.cx,head.cy,head.r,box.x,box.y,box.w,box.h)){
+    const ceilB=box.y+box.h, headTop=head.cy-head.r;
+    if(headTop<ceilB&&head.cy<box.y+box.h*0.55){ pl.y+=ceilB-headTop; pl.vy=0; return true; }
+  }
+  return false;
+}
+function _marioLedgeSlide(pl,input){
+  if(!input||!_marioOnAnyTop(pl)) return false;
   const x0=pl.x, y0=pl.y;
   for(const step of [3,5,8,12,16]){
     pl.x=x0+input*step;
     resolveBodyX(pl);
-    const prevFeet=y0+FEET_OFF;
-    resolvePlatY(pl,prevFeet);
-    if(Math.abs(pl.x-x0)>=1.5&&_onOmniblockTop(pl)){
+    resolvePlatY(pl,y0+FEET_OFF);
+    if(Math.abs(pl.x-x0)>=1.5&&_marioOnAnyTop(pl)){
       pl._groundHold=Math.max(pl._groundHold||0,4);
       return true;
     }
@@ -444,35 +508,25 @@ function _omniblockLedgeSlide(pl,input){
   }
   return false;
 }
-// Bwall AABB top is plat.y; bottom is plat.y+plat.h. Skip side shove when feet are on top or floor lip.
-function _bwallFeetSideClear(pl,plat,fL,fR,feet){
-  if(!plat||!plat.bw||!pl) return false;
-  if(pl===p&&typeof isPunch==='function'&&isPunch()) return true;
-  if(_feetOnBwallTopPlane(pl,plat,26)) return true;
-  const top=plat.y;
+// Legacy names used by main.js / selftest
+const _feetOnBwallTopPlane=_marioOnTop;
+const _onOmniblockTop=_marioOnAnyTop;
+const _omniblockLedgeSlide=_marioLedgeSlide;
+const _bwallFeetSideClear=(pl,plat,fL,fR,feet)=>_marioSkipSide(pl,plat);
+// KEEP OUT polygons trace omniblock columns in Tiled — skip those faces when on top.
+function _marioSkipKeepOut(pl,seg){
+  if(!pl||!seg||seg.nx==null) return false;
+  const wallish=Math.abs(seg.nx)>=0.5&&Math.abs(seg.ny)<=0.72;
+  if(!wallish||!_marioOnAnyTop(pl)) return false;
+  const segMinX=Math.min(seg.x1,seg.x2)-8, segMaxX=Math.max(seg.x1,seg.x2)+8;
   for(const bw of BWALLS){
-    if(!bw||bw.hp<=0||Math.abs(bw.y-top)>8) continue;
-    if(_feetOnBwallTopPlane(pl,bw,26)) return true;
-  }
-  if(feet>top+10) return false;
-  if(_playerStandingOnPlat(pl,plat)) return true;
-  return false;
-}
-// KEEP OUT vertical barriers duplicate omniblock faces — resolve one authority only.
-function _keepOutBarrierRedundantWithBwall(pl,seg){
-  if(!seg||seg.nx==null||Math.abs(seg.nx)<0.55||Math.abs(seg.ny)>0.45) return false;
-  const feet=pl.y+FEET_OFF, cx=pl.x+SW*0.5;
-  for(const bw of BWALLS){
-    if(!bw||bw.hp<=0) continue;
-    if(feet<bw.y-14||feet>bw.y+bw.h+14) continue;
-    const faceX=seg.nx>0?bw.x:bw.x+bw.w;
-    const cp=_segClosestPoint(seg,faceX,feet);
-    if(Math.abs(cp.x-faceX)>12||Math.abs(cp.y-feet)>28) continue;
-    if(seg.nx>0&&faceX>=cx-12) return true;
-    if(seg.nx<0&&faceX<=cx+12) return true;
+    if(_marioGone(bw)||!_marioOnTop(pl,bw)) continue;
+    const colMin=bw.x-10, colMax=bw.x+bw.w+10;
+    if(segMaxX>=colMin&&segMinX<=colMax) return true;
   }
   return false;
 }
+function _keepOutBarrierRedundantWithBwall(pl,seg){ return _marioSkipKeepOut(pl,seg); }
 function _isWorldBoundPlat(plat){
   if(!plat||plat.bw||plat.mv||plat.mp||plat.tp!=='solid') return false;
   const tall=plat.h>=(typeof WH!=='undefined'?WH:3200)*0.35;
@@ -480,13 +534,7 @@ function _isWorldBoundPlat(plat){
 }
 function _platSideCollisionSkip(pl,plat){
   if(!plat||_isWorldBoundPlat(plat)) return false;
-  if(plat.bw){
-    if(_playerStandingOnPlat(pl,plat)) return true;
-    const feet=pl.y+FEET_OFF;
-    const lip=plat.y+plat.h;
-    if(pl.og&&Math.abs(feet-lip)<=GROUND_SINK_MAX+10) return true;
-    return false;
-  }
+  if(plat.bw) return _marioOnTop(pl,plat);
   if(!_feetOnWalkSurface(pl)) return false;
   const feet=pl.y+FEET_OFF;
   return feet>=plat.y-12&&feet<=plat.y+Math.min(Math.max(plat.h,16),40)+12;
@@ -881,7 +929,7 @@ function _applySlopePhysics(pl){
 function _wheelEdgeRoll(pl){
   if(!pl||!pl.og) return;
   if(_ridingBwallTop(pl)) return;
-  if(_onOmniblockTop(pl)) return;
+  if(_marioOnAnyTop(pl)) return;
   if(pl.hook&&pl.hook.st==='on') return;
   if(pl._onSlope) return;
   if((pl._groundHold||0)>0) return;
@@ -993,6 +1041,7 @@ function _feetOnWalkSurface(pl){
 }
 function _resolveKeepOutBarrier(pl,seg){
   if(!seg||seg.nx==null) return false;
+  if(_marioSkipKeepOut(pl,seg)) return false;
   const probes=_wheelProbePoints(pl).concat(_bodyProbePoints(pl));
   let pushX=0,pushY=0,hit=false,maxPen=0;
   const feet=pl.y+FEET_OFF;
@@ -1045,18 +1094,10 @@ function _resolveBarrierSeg(pl,seg){
 }
 function _resolvePlatBodyX(pl,plat){
   if(plat.tp!=='solid') return false;
-  const feet=pl.y+FEET_OFF;
-  const fL=pl.x+FEET_L, fR=fL+FEET_W;
-  if(plat.bw){
-    if(_bwallFeetSideClear(pl,plat,fL,fR,feet)) return false;
-  }else if(_feetSpanOver(plat,fL,fR,8)&&feet>=plat.y-14&&feet<=plat.y+24){
-    return false;
-  }
-  if(_playerStandingOnPlat(pl,plat)) return false;
-  if(_platSideCollisionSkip(pl,plat)) return false;
-  const h=playerCoreHB(pl);
-  if(!ov(h.x,h.y,h.w,h.h,plat.x,plat.y,plat.w,plat.h)) return false;
   if(plat.poly&&_useSegGround&&plat.h<=32){
+    const feet=pl.y+FEET_OFF;
+    const h=playerCoreHB(pl);
+    if(!ov(h.x,h.y,h.w,h.h,plat.x,plat.y,plat.w,plat.h)) return false;
     if(_onWalkableTop(pl,plat)) return false;
     const sidePenL=h.x+h.w-plat.x, sidePenR=plat.x+plat.w-h.x;
     const yPen=Math.min(h.y+h.h-plat.y,plat.y+plat.h-h.y);
@@ -1064,16 +1105,7 @@ function _resolvePlatBodyX(pl,plat){
     const onFloorStrip=feet>=plat.y-6&&feet<=plat.y+plat.h+10;
     if(onFloorStrip&&xPen<=yPen+4) return false;
   }
-  const penL=(h.x+h.w)-plat.x, penR=(plat.x+plat.w)-h.x;
-  if(penL<=0||penR<=0) return false;
-  if(penL<=penR){
-    pl.x-=penL+COLL_CONTACT_GAP;
-    if((pl.vx||0)>0) pl.vx=0;
-  }else{
-    pl.x+=penR+COLL_CONTACT_GAP;
-    if((pl.vx||0)<0) pl.vx=0;
-  }
-  return true;
+  return _marioResolveSideX(pl,plat);
 }
 function _ridingBwallTop(pl){
   if(!pl) return null;
@@ -1084,11 +1116,7 @@ function _ridingBwallTop(pl){
   return null;
 }
 function _playerRidingBoxTop(pl,box){
-  if(!pl||!box) return false;
-  const feet=pl.y+FEET_OFF;
-  const fL=pl.x+FEET_L, fR=fL+FEET_W;
-  if(!_feetSpanOver(box,fL,fR,20)) return false;
-  return feet>=box.y-12&&feet<=box.y+16;
+  return _marioOnTop(pl,box,20);
 }
 function _playerOnSolidTop(pl,box){
   return _playerRidingBoxTop(pl,box);
@@ -1104,7 +1132,6 @@ function _playerStandingOnPlat(pl,plat){
 function resolveBodyX(pl){
   const passes=Math.abs(pl.vx||0)>WLK+2?8:4;
   const cx=pl.x+SW*0.5, xPad=SW+40;
-  const riding=_ridingBwallTop(pl);
   for(let pass=0;pass<passes;pass++){
     let moved=false;
     for(const plat of allP()){
@@ -1115,17 +1142,11 @@ function resolveBodyX(pl){
     }
     const h=playerCoreHB(pl);
     for(const c of CRATES){
-      if(!ov(h.x,h.y,h.w,h.h,c.x,c.y,c.w,c.h)) continue;
-      const penL=(h.x+h.w)-c.x, penR=(c.x+c.w)-h.x;
-      if(penL<=penR){ pl.x-=penL; if((pl.vx||0)>0) pl.vx=0; }
-      else{ pl.x+=penR; if((pl.vx||0)<0) pl.vx=0; }
-      moved=true;
+      if(_marioResolveSideX(pl,{x:c.x,y:c.y,w:c.w,h:c.h,tp:'solid'})) moved=true;
     }
-    if(!riding){
-      for(const seg of COLL_WALL_SEGS){
-        if(_keepOutBarrierRedundantWithBwall(pl,seg)) continue;
-        if(_resolveKeepOutBarrier(pl,seg)) moved=true;
-      }
+    for(const seg of COLL_WALL_SEGS){
+      if(_marioSkipKeepOut(pl,seg)) continue;
+      if(_resolveKeepOutBarrier(pl,seg)) moved=true;
     }
     if(!moved) break;
   }
@@ -1235,36 +1256,11 @@ function resolvePlatY(pl,prevFeet){
 function resY(prevFeet){ resolvePlatY(p,prevFeet); }
 function _bwallOverlapsPlayer(bw,pl){ if(!pl) return false; const h=playerCoreHB(pl); return ov(h.x,h.y,h.w,h.h,bw.x,bw.y,bw.w,bw.h); }
 function _resolvePlayerOutOfBwalls(pl){
-  if(!pl) return;
-  const head=playerHeadWorld(pl);
-  const feet=pl.y+FEET_OFF;
-  const fL=pl.x+FEET_L, fR=fL+FEET_W;
-  const cx=pl.x+SW*0.5;
+  if(!pl||pl._bwallFallGrace>0) return;
   for(const bw of BWALLS){
-    if(bw.hp<=0) continue;
-    if(pl._bwallFallGrace>0) continue;
-    if(_feetSpanOver(bw,fL,fR,16)&&_bwallCenterSupports(cx,bw)&&_feetCanLandOn(feet,pl._prevLandFeet,bw.y)){
-      if(feet>bw.y+GROUND_SINK_MAX+2) pl.y=bw.y-FEET_OFF;
-      pl.og=true;
-      if(pl.vy>0) pl.vy=0;
-      continue;
-    }
-    if(pl.vy<0){
-      const useBodyCeil=_useBodyCeilCollider(pl);
-      if(useBodyCeil){
-        const body=playerCoreHB(pl);
-        if(body.x+body.w>bw.x&&body.x<bw.x+bw.w){
-          const ceilB=bw.y+bw.h, bTop=body.y;
-          if(bTop<ceilB&&bTop+body.h>bw.y){pl.y+=ceilB-bTop;pl.vy=0;pl._autoHeadTuck=Math.min(1,Math.max(pl._autoHeadTuck||0,0.9));}
-        }
-      }else if(_circleRectOverlap(head.cx,head.cy,head.r,bw.x,bw.y,bw.w,bw.h)){
-        const ceilB=bw.y+bw.h, headTop=head.cy-head.r;
-        if(headTop<ceilB&&head.cy<bw.y+bw.h*0.55){
-          pl.y+=ceilB-headTop;
-          pl.vy=0;
-        }
-      }
-    }
+    if(_marioGone(bw)) continue;
+    if(_marioSnapWalkTop(pl,bw)) continue;
+    _marioBonkCeiling(pl,bw);
   }
 }
 function _isCeilingSeg(seg,bodyTop,feet){
@@ -1384,7 +1380,7 @@ function _pushGrindBlocked(pl){
 }
 function _syncPushGrind(pl){
   if(!pl||pl!==p) return;
-  if(_onOmniblockTop(pl)){ pl._grindF=0; return; }
+  if(_marioOnAnyTop(pl)){ pl._grindF=0; return; }
   const dirRaw=typeof _moveInputX==='function'?_moveInputX():0;
   const dir=Math.abs(dirRaw)<0.05?0:(dirRaw>0?1:-1);
   if(!dir||!pl.og){ pl._grindF=0; return; }
@@ -1433,7 +1429,7 @@ function _cornerStepResolve(pl){
   const inputRaw=pl===p&&typeof _moveInputX==='function'?_moveInputX():0;
   const input=Math.abs(inputRaw)<0.05?0:(inputRaw>0?1:-1);
   if(!input) return false;
-  if(_onOmniblockTop(pl)&&_omniblockLedgeSlide(pl,input)) return true;
+  if(_marioOnAnyTop(pl)&&_marioLedgeSlide(pl,input)) return true;
   const wt=_wallTouchInfo(pl);
   const stalled=(pl._grindF||0)>=2;
   const blockedIntoWall=wt.touch&&wt.dir===input;
@@ -2419,6 +2415,7 @@ function _wallTouchInfo(pl){
   let touch=false, dir=0, pen=0;
   if(COLL_WALL_SEGS.length){
     for(const seg of COLL_WALL_SEGS){
+      if(_marioSkipKeepOut(pl,seg)) continue;
       if(seg.nx!=null&&Math.abs(seg.nx)>0.55){
         for(const px of [bodyL+2,bodyR-2]){
           const cp=_segClosestPoint(seg,px,midY);
@@ -2442,7 +2439,7 @@ function _wallTouchInfo(pl){
       if(plat.tp!=='solid') continue;
       if(_isWorldBoundPlat(plat)) continue;
       if(!_platNearX(plat,cx,SW+24)) continue;
-      if(plat.bw&&_feetOnBwallTopPlane(pl,plat,22)) continue;
+      if(plat.bw&&_marioOnTop(pl,plat,22)) continue;
       if(bodyB<=plat.y+8||bodyT>=plat.y+plat.h-8) continue;
       if(bodyL<=plat.x+plat.w+nearPad&&bodyL>=plat.x+plat.w-deepPad){touch=true;dir=-1;break;}
       if(bodyR>=plat.x-nearPad&&bodyR<=plat.x+deepPad){touch=true;dir=1;break;}
