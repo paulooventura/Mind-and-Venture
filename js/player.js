@@ -45,13 +45,68 @@ window.addEventListener('keyup',e=>{
   if(e.code==='KeyF')  K['KeyF_kb']=false;
 });
 
-// Touch buttons (set up after DOM is ready — called from main.js)
+// Touch / analog stick (set up after DOM is ready — called from main.js)
+const TOUCH_STICK={x:0,y:0,active:false};
+const STICK_DEAD=0.2;
+
+function _initAnalogStick(){
+  const zone=document.getElementById('stickZone');
+  const knob=document.getElementById('stickKnob');
+  if(!zone||!knob) return;
+  const maxR=()=>Math.max(28,Math.min(zone.clientWidth,zone.clientHeight)*0.36);
+  let dragId=null;
+  const center=()=>{
+    const r=zone.getBoundingClientRect();
+    return {cx:r.left+r.width/2,cy:r.top+r.height/2};
+  };
+  const apply=(clientX,clientY)=>{
+    const {cx,cy}=center();
+    const mr=maxR();
+    let dx=clientX-cx, dy=clientY-cy;
+    const len=Math.hypot(dx,dy)||1;
+    if(len>mr){dx=dx/len*mr; dy=dy/len*mr;}
+    TOUCH_STICK.x=dx/mr;
+    TOUCH_STICK.y=dy/mr;
+    TOUCH_STICK.active=Math.hypot(TOUCH_STICK.x,TOUCH_STICK.y)>STICK_DEAD*0.5;
+    knob.style.transform='translate('+dx+'px,'+dy+'px)';
+  };
+  const reset=()=>{
+    dragId=null;
+    TOUCH_STICK.x=0; TOUCH_STICK.y=0; TOUCH_STICK.active=false;
+    knob.style.transform='translate(0,0)';
+  };
+  const down=e=>{
+    if(dragId!=null) return;
+    dragId=e.pointerId;
+    zone.setPointerCapture(e.pointerId);
+    apply(e.clientX,e.clientY);
+    e.preventDefault();
+  };
+  const move=e=>{
+    if(dragId!==e.pointerId) return;
+    apply(e.clientX,e.clientY);
+    e.preventDefault();
+  };
+  const up=e=>{
+    if(dragId!==e.pointerId) return;
+    try{zone.releasePointerCapture(e.pointerId);}catch(err){}
+    reset();
+    e.preventDefault();
+  };
+  zone.addEventListener('pointerdown',down);
+  zone.addEventListener('pointermove',move);
+  zone.addEventListener('pointerup',up);
+  zone.addEventListener('pointercancel',up);
+  zone.addEventListener('lostpointercapture',reset);
+}
+
 function _initTouchButtons(){
   const cv=document.getElementById('c');
   if(cv) cv.addEventListener('click',()=>{ cv.focus(); _unlockAudio(); });
-  ['bU','bL','bDn','bR','bSp','bE','bQ','bF'].forEach((id,i)=>{
+  _initAnalogStick();
+  ['bSp','bE','bQ','bF'].forEach((id,i)=>{
     const b=document.getElementById(id);
-    const code=['KeyW','KeyA','KeyS','KeyD','Space','KeyE','KeyQ','KeyF'][i];
+    const code=['Space','KeyE','KeyQ','KeyF'][i];
     if(!b) return;
     const on=e=>{ if(!K[code]) Kj[code]=true; K[code]=true; e.preventDefault(); };
     const off=()=>K[code]=false;
@@ -126,10 +181,22 @@ function readGamepad(){
 function clkj(){ Object.keys(Kj).forEach(k=>delete Kj[k]); }
 
 // ── Input helpers ─────────────────────────────────────────────
-function isUp(){   return _bindDown('up'); }
-function isDn(){   return _bindDown('down'); }
-function isLf(){   return _bindDown('left'); }
-function isRt(){   return _bindDown('right'); }
+function isUp(){
+  if(TOUCH_STICK.active&&TOUCH_STICK.y<-STICK_DEAD) return true;
+  return _bindDown('up');
+}
+function isDn(){
+  if(TOUCH_STICK.active&&TOUCH_STICK.y>STICK_DEAD) return true;
+  return _bindDown('down');
+}
+function isLf(){
+  if(TOUCH_STICK.active&&TOUCH_STICK.x<-STICK_DEAD) return true;
+  return _bindDown('left');
+}
+function isRt(){
+  if(TOUCH_STICK.active&&TOUCH_STICK.x>STICK_DEAD) return true;
+  return _bindDown('right');
+}
 function isJump(){ return _bindDown('jump'); }
 function isJumpJ(){ return _bindJ('jump'); }
 function isPunch(){ return _bindDown('punch'); }
@@ -140,6 +207,8 @@ function isSprintHeld(){
   return _punchHoldF>10&&((isRt()&&!isLf())||(isLf()&&!isRt()));
 }
 function _moveInputX(){
+  if(TOUCH_STICK.active&&Math.abs(TOUCH_STICK.x)>STICK_DEAD)
+    return Math.max(-1,Math.min(1,TOUCH_STICK.x));
   if(_bindDown('right')&&!_bindDown('left')) return 1;
   if(_bindDown('left')&&!_bindDown('right')) return -1;
   const r=!!(K['KeyD']||K['ArrowRight']);
@@ -209,7 +278,9 @@ function _updatePlayerMoveX(pl){
   if(_shutdownTimer>0) return;
   if(pl.hook&&pl.hook.st==='on') return;
   if(pl.wallGrip>0) return;
-  const dir=_moveInputX();
+  const dirRaw=_moveInputX();
+  const mag=Math.min(1,Math.abs(dirRaw));
+  const dir=mag<0.05?0:(dirRaw>0?1:-1);
   if(pl._moveBlocked&&dir){ pl.vx=0; return; }
   if((pl._grindF||0)>=8 && dir){ pl.vx=0; return; }
   const wt=typeof _wallTouchInfo==='function'?_wallTouchInfo(pl):{touch:false,dir:0};
@@ -268,8 +339,8 @@ function _updatePlayerMoveX(pl){
   }
   const vSign=pl.vx>0.15?1:(pl.vx<-0.15?-1:0);
   const turnMul=onSlope?1.35:MOVE_TURN;
-  if(vSign===-dir) pl.vx+=dir*accel*turnMul;
-  else             pl.vx+=dir*accel;
+  if(vSign===-dir) pl.vx+=dir*accel*turnMul*mag;
+  else             pl.vx+=dir*accel*mag;
   if(dir>0) pl.vx=Math.min(pl.vx,cap);
   else       pl.vx=Math.max(pl.vx,-cap);
   if(pushIntoWall){
