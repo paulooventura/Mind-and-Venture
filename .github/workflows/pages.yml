@@ -1,6 +1,7 @@
 name: Deploy GitHub Pages
 
-# Publishes main → https://mindandventure.pauloventura.org/ (see CNAME)
+# Deploy target: https://mindandventure.pauloventura.org/
+# GitHub Pages source MUST be "GitHub Actions" (not gh-pages branch).
 
 on:
   push:
