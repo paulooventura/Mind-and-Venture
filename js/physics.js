@@ -13,7 +13,7 @@
 
 // ── Movement constants ────────────────────────────────────────
 const GRAV=0.52, FRIC=0.88, GROUND_FRIC=0.52, RUN_COAST_FRIC=0.86, AIR_DRIFT=0.96;
-const MOVE_BUILD=44;
+const MOVE_BUILD=45;
 const MOVE_WALK=10.5;
 const MOVE_PEAK=1.0;
 const MOVE_RUN=16.5;
@@ -418,6 +418,21 @@ function _tileGrassSegUsable(seg){
 }
 // ── SMW solid collision (single rule set for map solids) ───────
 function _marioGone(box){ return !!(box&&box.hp!=null&&box.hp<=0); }
+function _marioWalkTopY(pl,feet,fL,fR,landSlop,prevFeet){
+  if(!pl) return null;
+  let colX=null, topY=null, bottomY=null;
+  for(const bw of BWALLS){
+    if(_marioGone(bw)||!_feetSpanOver(bw,fL,fR,24)) continue;
+    if(colX==null) colX=bw.x;
+    else if(Math.abs(bw.x-colX)>6) continue;
+    if(topY==null||bw.y>topY) topY=bw.y;
+    bottomY=Math.max(bottomY||0,bw.y+bw.h);
+  }
+  if(topY==null) return null;
+  if(feet<topY-LAND_FEET_TOL) return null;
+  if(feet>bottomY+landSlop+28) return null;
+  return topY;
+}
 function _marioOnTop(pl,box,seam){
   if(!pl||!box||_marioGone(box)) return false;
   const feet=pl.y+FEET_OFF;
@@ -438,6 +453,13 @@ function _marioSkipSide(pl,box){
   if(!pl||!box||_marioGone(box)) return true;
   if(pl===p&&typeof isPunch==='function'&&isPunch()) return true;
   if(_marioOnTop(pl,box)) return true;
+  if(box.bw&&_marioOnAnyTop(pl)){
+    for(const bw of BWALLS){
+      if(_marioGone(bw)) continue;
+      if(Math.abs(bw.x-box.x)>4||Math.abs(bw.w-box.w)>4) continue;
+      if(_marioOnTop(pl,bw)) return true;
+    }
+  }
   const top=box.y;
   for(const bw of BWALLS){
     if(_marioGone(bw)||Math.abs(bw.y-top)>8) continue;
@@ -515,14 +537,16 @@ const _omniblockLedgeSlide=_marioLedgeSlide;
 const _bwallFeetSideClear=(pl,plat,fL,fR,feet)=>_marioSkipSide(pl,plat);
 // KEEP OUT polygons trace omniblock columns in Tiled — skip those faces when on top.
 function _marioSkipKeepOut(pl,seg){
-  if(!pl||!seg||seg.nx==null) return false;
-  const wallish=Math.abs(seg.nx)>=0.5&&Math.abs(seg.ny)<=0.72;
-  if(!wallish||!_marioOnAnyTop(pl)) return false;
+  if(!pl||!seg||seg.nx==null||!_marioOnAnyTop(pl)) return false;
+  const feet=pl.y+FEET_OFF;
   const segMinX=Math.min(seg.x1,seg.x2)-8, segMaxX=Math.max(seg.x1,seg.x2)+8;
+  const segMinY=Math.min(seg.y1,seg.y2), segMaxY=Math.max(seg.y1,seg.y2);
   for(const bw of BWALLS){
     if(_marioGone(bw)||!_marioOnTop(pl,bw)) continue;
     const colMin=bw.x-10, colMax=bw.x+bw.w+10;
-    if(segMaxX>=colMin&&segMinX<=colMax) return true;
+    if(segMaxX<colMin||segMinX>colMax) continue;
+    if(Math.abs(seg.nx)>=0.5&&Math.abs(seg.ny)<=0.72) return true;
+    if(Math.abs(seg.ny)>=0.5&&Math.abs(seg.nx)<=0.72&&segMinY>=bw.y-4&&segMinY<=bw.y+bw.h+36) return true;
   }
   return false;
 }
@@ -970,7 +994,11 @@ function _wheelEdgeRoll(pl){
     if(lean>0.82){pl.og=false;pl.vy=Math.max(pl.vy||0,0.38);}
   }
 }
-function _feetSpanOver(plat,fL,fR,seam=COLL_SEAM){ return fR>plat.x-seam&&fL<plat.x+plat.w+seam; }
+function _feetSpanOver(plat,fL,fR,seam=COLL_SEAM){
+  if(fR<=plat.x-seam||fL>=plat.x+plat.w+seam) return false;
+  const o=Math.min(fR,plat.x+plat.w)-Math.max(fL,plat.x);
+  return o>=Math.max(4,seam*0.12);
+}
 function _feetPlatSpan(pl,plat,seam=COLL_SEAM){ const fL=pl.x+FEET_L, fR=fL+FEET_W; return _feetSpanOver(plat,fL,fR,seam); }
 function _platNearX(plat,cx,pad){ return plat.x+plat.w>=cx-pad&&plat.x<=cx+pad; }
 function _mergeCollRects(rects,gap=COLL_SEAM){
@@ -1163,7 +1191,10 @@ function resolvePlatY(pl,prevFeet){
   if(pl.vy>=0){
     const cx=pl.x+SW*0.5;
     let bestTop=null, landSeg=null, landAng=0;
-    if(_useSegGround&&COLL_SEGS.length){
+    const marioTop=_marioWalkTopY(pl,feet,fL,fR,landSlop,prevFeet);
+    if(marioTop!=null){
+      bestTop=marioTop;
+    }else if(_useSegGround&&COLL_SEGS.length){
       const sup=_wheelSupportAt(cx,feet,{maxUp:landSlop+12,maxDrop:landSlop+56,pl});
       if(sup&&sup.frac>=WHEEL_MIN_SUPPORT) bestTop=sup.y;
       if(sup&&sup.seg){ landSeg=sup.seg; landAng=sup.seg.angle||0; }
@@ -1396,6 +1427,7 @@ function _syncPushGrind(pl){
 }
 function _haltBlockedMove(pl,x0,y0,vx,vy){
   if(!pl) return;
+  if(_marioOnAnyTop(pl)&&Math.abs(vx)>0.05) return;
   const input=pl===p&&typeof _moveInputX==='function'?_moveInputX():0;
   const dx=pl.x-x0, dy=pl.y-y0;
   const tryCorner=!!(input&&_playerOnGround(pl)&&(pl._grindF||0)>=2);
@@ -1417,6 +1449,7 @@ function _haltBlockedMove(pl,x0,y0,vx,vy){
 }
 function _haltVelocityAtContacts(pl){
   if(!pl||(pl.hook&&pl.hook.st==='on')||pl.wallGrip>0) return;
+  if(_marioOnAnyTop(pl)) return;
   const wt=typeof _wallTouchInfo==='function'?_wallTouchInfo(pl):{touch:false,dir:0};
   if(!wt.touch) return;
   if(wt.dir>0&&(pl.vx||0)>0) pl.vx=0;

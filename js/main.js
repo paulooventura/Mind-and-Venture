@@ -991,13 +991,9 @@ function update(){
       if(_blocked){
         const onBox=typeof _onOmniblockTop==='function'&&_onOmniblockTop(p);
         if(onBox){
-          if(typeof _cornerStepResolve==='function'&&_cornerStepResolve(p)){
-            p._moveBlocked=false; p._grindF=0;
-          }else{
-            p._moveBlocked=false;
-            p._grindF=0;
-            p.vx*=0.9;
-          }
+          p._moveBlocked=false; p._grindF=0;
+          if(typeof _marioLedgeSlide==='function'&&_moveSign&&_marioLedgeSlide(p,_moveSign)){}
+          else if(Math.abs(p.vx||0)>0.5) p.vx*=0.96;
         }else if(typeof _cornerStepResolve==='function'&&_cornerStepResolve(p)) p._moveBlocked=false;
         else{
           p.vx=0;
