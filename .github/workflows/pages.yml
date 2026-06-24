@@ -1,5 +1,7 @@
 name: Deploy GitHub Pages
 
+# Publishes main → https://mindandventure.pauloventura.org/ (see CNAME)
+
 on:
   push:
     branches: [main]
