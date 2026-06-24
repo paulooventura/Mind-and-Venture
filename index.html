@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mind & Venture">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#04020a">
+<meta name="description" content="Mind & Venture — a 2D platformer by Paulo Ventura. Play in your browser: wheel, lightbulb, cable arms, and audio-powered items.">
+<link rel="canonical" href="https://mind-and-venture.netlify.app/">
+<meta property="og:title" content="Mind & Venture">
+<meta property="og:description" content="Play Mind & Venture in your browser — a sentient studio monitor on a wheel, exploring Awdjoo Town.">
+<meta property="og:image" content="https://mind-and-venture.netlify.app/assets/story/title-key-art.png">
+<meta property="og:url" content="https://mind-and-venture.netlify.app/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mind & Venture">
+<meta name="twitter:description" content="Play in your browser — platformer by Paulo Ventura.">
+<meta name="twitter:image" content="https://mind-and-venture.netlify.app/assets/story/title-key-art.png">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Mind &amp; Venture</title>
+<script>window.MV_BUILD='95';</script>
+<script>
+if(location.protocol==='file:'){
+  document.addEventListener('DOMContentLoaded',function(){
+    var v=document.getElementById('mvVer');
+    if(v){v.style.color='#f66';v.textContent='WRONG: opened as file:// — close this tab and run PLAY.bat (uses http://127.0.0.1:8765)';}
+  });
+}
+</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/story/title-key-art.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{min-height:100%;overscroll-behavior:none;}
+body{background:#04020a;display:flex;flex-direction:column;align-items:center;
+  padding:8px;font-family:monospace;gap:4px;}
+canvas{image-rendering:auto;
+  image-rendering:-moz-crisp-edges;image-rendering:-webkit-optimize-contrast;
+  -ms-interpolation-mode:nearest-neighbor;max-width:100%;width:100%;height:auto;
+  border:1px solid #1a1a30;cursor:crosshair;touch-action:none;}
+.row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
+button{background:#111122;color:#666;border:1px solid #222;padding:5px 10px;
+  border-radius:4px;font:9px monospace;cursor:pointer;touch-action:none;user-select:none;}
+.dpad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(2,30px);gap:2px;}
+@media (max-width:1100px){
+  body{padding:4px;gap:3px;}
+  button{padding:8px 12px;font-size:11px;min-height:44px;}
+  .dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);}
+}
+@media (display-mode:standalone){
+  body{padding:2px;gap:2px;}
+  #mvVer{display:none;}
+}
+#battleHud{display:none;box-sizing:border-box;position:fixed;top:0;left:0;right:0;z-index:9000;padding:18px 22px;background:linear-gradient(180deg,#1a0a22 0%,#120a1a 88%,transparent 100%);border-bottom:4px solid #e44;font-family:Segoe UI,system-ui,sans-serif;color:#fff;pointer-events:none;}
+#battleHud .bh-title{font-size:clamp(32px,7vw,52px);font-weight:800;color:#f88;letter-spacing:.05em;margin-bottom:10px;text-align:center;text-shadow:0 2px 8px #000;}
+#battleHud .bh-row{display:flex;justify-content:center;gap:clamp(16px,5vw,48px);flex-wrap:wrap;font-size:clamp(26px,5.5vw,42px);font-weight:800;}
+#battleHud .bh-kills{color:#8feb8f;text-shadow:0 1px 4px #000;}
+#battleHud .bh-deaths{color:#faa;text-shadow:0 1px 4px #000;}
+#battleHud .bh-hp{color:#fff;text-shadow:0 1px 4px #000;}
+#battleHud .bh-rival{margin-top:12px;text-align:center;font-size:clamp(28px,6vw,44px);font-weight:800;color:#fc8;text-shadow:0 2px 6px #000;}
+#gameWrap{position:relative;display:inline-block;max-width:100%;}
+</style>
+</head>
+<body>
+<div id="mvVer" style="font-size:13px;color:#6f6;font-weight:bold;font-family:monospace;margin:4px 0">Mind &amp; Venture · Awdjoo · build 95</div>
+<div id="battleHud">
+  <div class="bh-title">BATTLE PRACTICE</div>
+  <div class="bh-row">
+    <span class="bh-kills" id="battleKills">KILLS 0</span>
+    <span class="bh-deaths" id="battleDeaths">DEATHS 0</span>
+    <span class="bh-hp" id="battleHp">HP 100</span>
+  </div>
+  <div class="bh-rival" id="battleRival">VS SIGNOL</div>
+</div>
+<div id="gameWrap">
+<canvas id="c" width="1024" height="768"></canvas>
+</div>
+<div id="inf" style="font-size:10px;color:#0f0;min-height:16px;word-break:break-all;"></div>
+<div class="row">
+  <div class="dpad">
+    <div></div><button id="bU">W↑</button><div></div>
+    <button id="bL">A←</button><button id="bDn">S↓</button><button id="bR">D→</button>
+  </div>
+  <button id="bSp" style="height:30px;padding:0 12px;font-weight:700;">SPACE</button>
+  <button id="bE" style="height:30px;padding:0 10px;color:#0ff;">E</button>
+  <button id="bQ" style="height:30px;padding:0 10px;color:#f90;">Q</button>
+  <button id="bF" style="height:30px;padding:0 10px;color:#f66;">F</button>
+  <button id="bTest" style="height:30px;padding:0 12px;color:#0f0;background:#001800;border-color:#0a4400;font-weight:700;">🔬 TEST</button>
+  <button id="bRst" style="height:30px;padding:0 12px;font-weight:700;color:#ff0;background:#221100;border-color:#554400;">↺ RESET</button>
+</div>
+<p style="font-size:8px;color:#222;margin-top:2px;">
+  WASD/Arrows move+aim · Space jump · S duck · E use item · Q swap · F punch · Tab reset
+</p>
+<script>
+window.onerror=function(msg,src,line,col,err){
+  var s=src?String(src):'';
+  if(/inpage\.js|content[_-]?script|extension:\/\/|chrome-extension:|moz-extension:|safari-extension:/i.test(s)) return true;
+  var inf=document.getElementById('inf');
+  if(inf){
+    inf.style.color='#ff0';
+    var file=s?(s.split('/').pop().split('?')[0]):'?';
+    inf.textContent='ERROR: '+msg+' ('+file+':'+line+')';
+  }
+  console.error('MV onerror',msg,src,line,err);
+  return false;
+};
+</script>
+<script src="js/save.js?v=25"></script>
+<script src="js/core.js?v=25"></script>
+<script src="js/audio.js?v=25"></script>
+<script src="js/enemies.js?v=33"></script>
+<script src="js/physics.js?v=95"></script>
+<script src="js/player.js?v=95"></script>
+<script src="js/weapons.js?v=27"></script>
+<script src="js/ui.js?v=94"></script>
+<script src="js/render.js?v=65"></script>
+<script src="js/editor.js?v=25"></script>
+<script src="js/spawn_fix.js?v=52"></script>
+<script src="js/awdjoo_level.js?v=1"></script>
+<script src="js/healthwatch.js?v=1"></script>
+<script src="js/awdjoo_map.js?v=44"></script>
+<script src="js/main.js?v=94"></script>
+<script src="js/selftest.js?v=13"></script>
+<script>
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  window.addEventListener('load',function(){
+    var SW_BUILD='95';
+    if(/[?&](selftest|ci)=/i.test(location.search)) return;
+    var stored=localStorage.getItem('mv_sw_build');
+    if(stored!==SW_BUILD||window.MV_BUILD!==SW_BUILD){
+      localStorage.setItem('mv_sw_build',SW_BUILD);
+      navigator.serviceWorker.getRegistrations().then(function(regs){
+        return Promise.all(regs.map(function(r){return r.unregister();}));
+      }).finally(function(){
+        var q=location.search.replace(/^\?/,'');
+        var bust='b='+SW_BUILD+'-'+Date.now();
+        location.replace(location.pathname+'?'+(q?q+'&':'')+bust);
+      });
+      return;
+    }
+    navigator.serviceWorker.register('./sw.js?v='+SW_BUILD).catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
