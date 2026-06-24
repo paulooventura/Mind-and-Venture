@@ -281,11 +281,11 @@ function _updatePlayerMoveX(pl){
   const dirRaw=_moveInputX();
   const mag=Math.min(1,Math.abs(dirRaw));
   const dir=mag<0.05?0:(dirRaw>0?1:-1);
-  if(pl._moveBlocked&&dir&&!_marioWalkFree(pl)){ pl.vx=0; return; }
-  if((pl._grindF||0)>=8 && dir && !_marioWalkFree(pl)){ pl.vx=0; return; }
+  if(pl._moveBlocked&&dir&&!_marioOnAnyTop(pl)){ pl.vx=0; return; }
+  if((pl._grindF||0)>=8 && dir && !_marioOnAnyTop(pl)){ pl.vx=0; return; }
   const wt=typeof _wallTouchInfo==='function'?_wallTouchInfo(pl):{touch:false,dir:0};
   const pushIntoWall=!!(wt.touch&&dir&&wt.dir===dir);
-  if(pushIntoWall&&(pl._grindF||0)>=2&&!_marioWalkFree(pl)){ pl.vx=0; return; }
+  if(pushIntoWall&&(pl._grindF||0)>=2&&!_marioOnAnyTop(pl)){ pl.vx=0; return; }
   const grounded=!!_playerOnGround(pl);
   const onSlope=!!(grounded&&pl._onSlope);
   const sprint=isSprintHeld()&&grounded&&dir!==0;

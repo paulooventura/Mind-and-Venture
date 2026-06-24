@@ -13,7 +13,7 @@
 
 // ── Movement constants ────────────────────────────────────────
 const GRAV=0.52, FRIC=0.88, GROUND_FRIC=0.52, RUN_COAST_FRIC=0.86, AIR_DRIFT=0.96;
-const MOVE_BUILD=47;
+const MOVE_BUILD=48;
 const MOVE_WALK=10.5;
 const MOVE_PEAK=1.0;
 const MOVE_RUN=16.5;
@@ -453,10 +453,27 @@ function _marioOnAnyTop(pl){
 function _marioWalkFree(pl){
   return _marioOnAnyTop(pl);
 }
+function _marioWalkSurfaceTop(pl){
+  if(!pl) return null;
+  let top=null;
+  for(const bw of BWALLS){
+    if(_marioGone(bw)||!_marioOnTop(pl,bw)) continue;
+    if(top===null||bw.y>top) top=bw.y;
+  }
+  return top;
+}
 function _marioSkipSide(pl,box){
   if(!pl||!box||_marioGone(box)) return true;
   if(pl===p&&typeof isPunch==='function'&&isPunch()) return true;
   if(_marioOnTop(pl,box)) return true;
+  const surfTop=_marioWalkSurfaceTop(pl);
+  if(surfTop!=null&&box.bw){
+    for(const bw of BWALLS){
+      if(_marioGone(bw)||!_marioOnTop(pl,bw)) continue;
+      if(Math.abs(bw.x-box.x)>8) continue;
+      if(box.y<=surfTop+MARIO_SIDE_FACE) return true;
+    }
+  }
   const top=box.y;
   for(const bw of BWALLS){
     if(_marioGone(bw)||Math.abs(bw.y-top)>8) continue;
@@ -499,10 +516,7 @@ function _marioSnapWalkTop(pl,box){
   if(!pl||!box||_marioGone(box)) return false;
   const feet=pl.y+FEET_OFF;
   const fL=pl.x+FEET_L, fR=fL+FEET_W;
-  const cx=pl.x+SW*0.5;
-  if(!_feetSpanOver(box,fL,fR,22)) return false;
-  if(box.bw&&!_bwallCenterSupports(cx,box)) return false;
-  if(cx<box.x+4||cx>box.x+box.w-4) return false;
+  if(!_feetSpanOver(box,fL,fR,20)) return false;
   if(!_feetCanLandOn(feet,pl._prevLandFeet,box.y)) return false;
   if(feet>box.y+GROUND_SINK_MAX+2) pl.y=box.y-FEET_OFF;
   pl.og=true;
@@ -530,12 +544,13 @@ function _marioBonkCeiling(pl,box){
 function _marioLedgeSlide(pl,input){
   if(!input||!_marioOnAnyTop(pl)) return false;
   const x0=pl.x, y0=pl.y;
-  for(const step of [3,5,8,12,16]){
+  for(const step of [2,4,6,8,12,16,20,24]){
     pl.x=x0+input*step;
     resolveBodyX(pl);
     resolvePlatY(pl,y0+FEET_OFF);
-    if(Math.abs(pl.x-x0)>=1.5&&_marioOnAnyTop(pl)){
-      pl._groundHold=Math.max(pl._groundHold||0,4);
+    if(Math.abs(pl.x-x0)>=1&&_marioOnAnyTop(pl)){
+      pl._groundHold=Math.max(pl._groundHold||0,6);
+      pl._grindF=0; pl._moveBlocked=false;
       return true;
     }
     pl.x=x0; pl.y=y0;
@@ -964,7 +979,7 @@ function _applySlopePhysics(pl){
 function _wheelEdgeRoll(pl){
   if(!pl||!pl.og) return;
   if(_ridingBwallTop(pl)) return;
-  if(_marioWalkFree(pl)) return;
+  if(_marioOnAnyTop(pl)) return;
   if(pl.hook&&pl.hook.st==='on') return;
   if(pl._onSlope) return;
   if((pl._groundHold||0)>0) return;
@@ -1845,9 +1860,18 @@ function _marioEjectFromSolids(pl){
   for(let pass=0;pass<6;pass++){
     let moved=false;
     const h=playerCoreHB(pl);
+    const surfTop=_marioWalkSurfaceTop(pl);
     for(const bw of BWALLS){
       if(_marioGone(bw)) continue;
       if(_marioOnTop(pl,bw)) continue;
+      if(surfTop!=null&&bw.y<=surfTop+MARIO_SIDE_FACE){
+        let col=false;
+        for(const atop of BWALLS){
+          if(_marioGone(atop)||!_marioOnTop(pl,atop)) continue;
+          if(Math.abs(atop.x-bw.x)<=8){ col=true; break; }
+        }
+        if(col) continue;
+      }
       if(!ov(h.x,h.y,h.w,h.h,bw.x,bw.y,bw.w,bw.h)) continue;
       const fake={x:bw.x,y:bw.y,w:bw.w,h:bw.h,tp:'solid',bw:true};
       if(_marioResolveSideX(pl,fake)){ moved=true; continue; }
@@ -2378,6 +2402,7 @@ function _playerGrounded(pl){
   if(pl.wallGrip>0) return false;
   if((pl.jf||0)>0) return false;
   if((pl.vy||0)<-0.45) return false;
+  if(_marioOnAnyTop(pl)&&(pl.vy||0)<=3) return true;
   const wc=playerWheelCol(pl);
   const feet=wc.cy+wc.r;
   for(const bw of BWALLS){

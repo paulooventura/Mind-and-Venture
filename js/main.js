@@ -992,8 +992,10 @@ function update(){
         const onBox=typeof _onOmniblockTop==='function'&&_onOmniblockTop(p);
         if(onBox){
           p._moveBlocked=false; p._grindF=0;
-          if(typeof _marioLedgeSlide==='function'&&_moveSign&&_marioLedgeSlide(p,_moveSign)){}
-          else if(Math.abs(p.vx||0)>0.5) p.vx*=0.96;
+          if(typeof _marioLedgeSlide==='function'&&_marioLedgeSlide(p,_moveSign)){}
+          else if(Math.abs(p.vx||0)<0.35&&_moveSign){
+            p.vx=_moveSign*Math.min(typeof MOVE_WALK!=='undefined'?MOVE_WALK:10.5,2.5);
+          }else if(Math.abs(p.vx||0)>0.5) p.vx*=0.98;
         }else if(typeof _cornerStepResolve==='function'&&_cornerStepResolve(p)) p._moveBlocked=false;
         else{
           p.vx=0;
