@@ -985,9 +985,6 @@ function update(){
     const _moveRaw=_moveInputX();
     const _moveSign=_moveRaw>0.05?1:(_moveRaw<-0.05?-1:0);
     if(_moveSign&&_playerOnGround(p)){
-      if(_tileCampaignActive()&&typeof _marioWalkFree==='function'&&_marioWalkFree(p)){
-        p._moveBlocked=false; p._grindF=0;
-      }else{
       const _moved=Math.abs(p.x-p._ux0);
       const _vx=Math.abs(p.vx||0);
       const _blocked=_vx>0.35&&_moved<_vx*0.22;
@@ -1005,7 +1002,6 @@ function update(){
           if(!(_wt.touch&&_wt.dir===_moveSign)) p._grindF=Math.min(12,(p._grindF||0)+1);
         }
       }else if(_moved>=Math.max(1.2,_vx*0.45)){ p._grindF=0; p._moveBlocked=false; }
-      }
     }else if(!_moveSign) p._moveBlocked=false;
   }else if(p.hook.st!=='on'&&p.wallGrip>0){ _movePlayerWithColl(p,p.vx,p.vy); }
   if(p.y<20){p.y=20;p.vy=Math.max(0,p.vy);}
