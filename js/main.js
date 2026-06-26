@@ -1088,6 +1088,7 @@ function draw(){
   p._armPose=computeConnectorArmPose(p); if(p2)p2._armPose=computeConnectorArmPose(p2);
   drawFX(); ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
   try{drawCharacter();}catch(err){console.error('player draw',err);}
+  if(typeof drawMvDebugOverlay==='function') drawMvDebugOverlay();
   if(_playerCount===2&&p2){try{drawCharacterFor(p2);}catch(err){console.error('p2 draw',err);}}
   for(const e of ENEMS) if(e.mind) drawMindEnemy(e);
   drawRopePickupAnim(); drawTmjForeground(); drawFgLampGlow(); drawDamageOverlay(); drawItemTutorial(); drawHUD(); drawAtmosphere();
