@@ -2,10 +2,11 @@
 
 **Hand this file to ChatGPT, Gemini, or any collaborator** for full context on what the game is, where development stands, and how movement/collision is coded.
 
-Last updated: **build 105** · commit `222be33` on `main`  
+Last updated: **build 106** · `main`  
 Repo: https://github.com/paulooventura/Mind-and-Venture  
-Play (GitHub Pages): https://paulooventura.github.io/Mind-and-Venture/  
-Custom domain (needs Pages settings fix): https://mindandventure.pauloventura.org/
+Play (GitHub Pages): https://paulooventura.github.io/Mind-and-Venture/?debug=1  
+Custom domain: https://mindandventure.pauloventura.org/?debug=1  
+Local: double-click `PLAY.bat` → http://127.0.0.1:8765/?debug=1
 
 ---
 
@@ -25,7 +26,7 @@ Custom domain (needs Pages settings fix): https://mindandventure.pauloventura.or
 
 | Area | Status |
 |------|--------|
-| **Build** | **105** (`window.MV_BUILD`, script `?v=105`, SW cache `mv-web-v105`) |
+| **Build** | **106** (`window.MV_BUILD`, script `?v=106`, SW cache `mv-web-v106`) |
 | **Movement tuning** | `MOVE_BUILD=48` in `js/physics.js` |
 | **Campaign** | Awdjoo zone 0: spawn House 2 → basement RCA → exit House 5 east |
 | **Recent engineering** | Mario World–style solid rules for omniblocks; fix wall phasing; seamless walk on block tops |
@@ -39,7 +40,6 @@ Custom domain (needs Pages settings fix): https://mindandventure.pauloventura.or
 - Tiled **KEEP OUT!** polygons trace omniblock columns and duplicate collision faces; code skips via `_marioSkipKeepOut`.
 - Self-test still reports `stuckWalking` in east corridor (~x=1180) — may be map geometry / KEEP OUT at x≈1248.
 - Custom domain CNAME occasionally drops from GitHub Pages settings → 404 until reconfigured.
-- Static HTML footer still says “build 98” until `index.html` `#mvVer` text is synced (runtime HUD uses `MV_BUILD`).
 
 ---
 
@@ -269,9 +269,8 @@ Serve over HTTP (not `file://`). Local dev typically uses port **8765** (`PLAY.b
 3. **Slopes:** Wheel coast and uphill drive feel natural.
 4. **Sprint:** Shift ramps to run speed without instant snap.
 5. **RCA:** Pick up in basement, grapple works.
-6. **HUD:** After load, `#mvVer` should show `build 105 | MOVE v48 | speed …`.
-
----
+6. **HUD:** After load, `#mvVer` should show `build 106 | MOVE v48 | speed …`.
+7. **Debug overlay:** `?debug=1` or **` (backquote) in-game.
 
 ## 12. Related files (if they need more depth)
 
