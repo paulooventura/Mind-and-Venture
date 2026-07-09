@@ -251,6 +251,22 @@ function _pushTestLabMovPlats() {
   }
 }
 
+function _testLabAirborne(pl) {
+  if (!pl) return false;
+  if ((pl.jf || 0) > 0) return true;
+  if ((pl.vy || 0) < -0.12) return true;
+  if (!pl.og && (pl._groundHold || 0) <= 0 && (pl.vy || 0) < 1.2) return true;
+  return false;
+}
+
+function _testLabLeavingPlat(pl, plat, prevFeet, feet) {
+  if (!pl || !plat || (pl.vy || 0) >= 0) return false;
+  const tol = Math.max(20, Math.abs(pl.vy || 0) + 14);
+  if (prevFeet >= plat.y - 16 && prevFeet <= plat.y + plat.h + tol) return true;
+  if (feet >= plat.y - 32 && feet <= plat.y + plat.h + tol + 32) return true;
+  return false;
+}
+
 function _testLabPlayerGrounded(pl) {
   if (!pl || !_testLabMode) return false;
   if (pl.hook && pl.hook.st === 'on') return false;
@@ -286,9 +302,7 @@ function _testLabOnWalkSurface(pl, plat) {
 }
 
 function _testLabSnapLanding(pl) {
-  if (!pl || !_testLabMode) return;
-  if ((pl.jf || 0) > 0) return;
-  if ((pl.vy || 0) < 0) return;
+  if (!pl || !_testLabMode || _testLabAirborne(pl)) return;
   if (pl.hook && pl.hook.st === 'on') return;
   const feet = pl.y + FEET_OFF;
   const fL = pl.x + FEET_L, fR = fL + FEET_W;
@@ -306,6 +320,7 @@ function _testLabSnapLanding(pl) {
 
 function _testLabUnstick(pl) {
   if (!pl || !_testLabMode) return;
+  if (_testLabAirborne(pl)) return;
   const body = playerCoreHB(pl);
   const feet = pl.y + FEET_OFF;
   const cx = pl.x + SW * 0.5;

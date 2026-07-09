@@ -1221,6 +1221,7 @@ function resolvePlatY(pl,prevFeet){
   if(pl.vy>=0){
     const cx=pl.x+SW*0.5;
     if(typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabWalkSurfaceY==='function'){
+      if((pl.jf||0)<=0&&(pl.vy||0)>=-0.1){
       const tlSurf=_testLabWalkSurfaceY(cx,feet,landSlop,fL,fR);
       if(tlSurf!=null&&_feetCanLandOn(feet,prevFeet,tlSurf)){
         if(pl.hook&&pl.hook.st==='on') return;
@@ -1242,6 +1243,7 @@ function resolvePlatY(pl,prevFeet){
         }
         pl._groundHold=10;
         return;
+      }
       }
     }
     let bestTop=null, landSeg=null, landAng=0;
@@ -1317,6 +1319,7 @@ function resolvePlatY(pl,prevFeet){
     }else if(plat.tp==='solid'||plat.tp==='ceil'){
       if(plat.bw&&_playerRidingBoxTop(pl,plat)) continue;
       if(!_platNearX(plat,pl.x+SW*0.5,SW+32)) continue;
+      if(typeof _testLabLeavingPlat==='function'&&_testLabLeavingPlat(pl,plat,prevFeet,feet)) continue;
       if(typeof _testLabMode!=='undefined'&&_testLabMode&&feet>=plat.y-8&&feet<=plat.y+plat.h+8) continue;
       const useBodyCeil=_useBodyCeilCollider(pl);
       const body=playerCoreHB(pl);
@@ -1331,6 +1334,7 @@ function resolvePlatY(pl,prevFeet){
           const ceilB=plat.y+plat.h, headTop=head.cy-head.r;
           if(headTop<ceilB){pl.y+=ceilB-headTop;pl.vy=0;pl._autoHeadTuck=Math.min(1,(pl._autoHeadTuck||0)+0.18);}
         }else if(ov(h.x,h.y,h.w,h.h,plat.x,plat.y,plat.w,plat.h)){
+          if(feet>=plat.y-12) continue;
           pl.y=plat.y+plat.h-(FEET_OFF-(pl===p?hbH(pl.crouchAmt):STAND_H));
           pl.vy=0;
         }
@@ -1447,6 +1451,7 @@ function _resolveHeadCeiling(pl){
     if(plat.tp!=='ceil'&&plat.tp!=='solid') continue;
     if(plat.bw&&_playerRidingBoxTop(pl,plat)) continue;
     if(!_platNearX(plat,cx,SW+24)) continue;
+    if(typeof _testLabLeavingPlat==='function'&&_testLabLeavingPlat(pl,plat,pl._prevLandFeet!=null?pl._prevLandFeet:feet,feet)) continue;
     if(typeof _testLabMode!=='undefined'&&_testLabMode&&feet>=plat.y-8&&feet<=plat.y+plat.h+8) continue;
     if(useBody){
       if(fR<=plat.x||fL>=plat.x+plat.w) continue;
@@ -1925,6 +1930,7 @@ function _marioEjectFromSolids(pl){
       if(plat.poly&&_useSegGround) continue;
       if(!_platNearX(plat,cx,xPad)) continue;
       if(!ov(h.x,h.y,h.w,h.h,plat.x,plat.y,plat.w,plat.h)) continue;
+      if(typeof _testLabLeavingPlat==='function'&&_testLabLeavingPlat(pl,plat,pl._prevLandFeet!=null?pl._prevLandFeet:pl.y+FEET_OFF,pl.y+FEET_OFF)) continue;
       if(_playerStandingOnPlat(pl,plat)&&plat.h<=32) continue;
       const oX=Math.min(h.x+h.w,plat.x+plat.w)-Math.max(h.x,plat.x);
       const oY=Math.min(h.y+h.h,plat.y+plat.h)-Math.max(h.y,plat.y);
@@ -2065,8 +2071,10 @@ function _stabilizePlayerCollision(pl){
   }
   _resolveHeadCeiling(pl);
   if(pl._bwallFallGrace<=0){
-    if(!(_tileCampaignActive()&&(pl._groundHold||0)>4)&&(pl._groundHold||0)<=2)
-      _wheelSettle(pl,{maxUp:20,maxDrop:COLL_LEDGE_STEP+12});
+    if(!(_tileCampaignActive()&&(pl._groundHold||0)>4)&&(pl._groundHold||0)<=2){
+      const skipSettle=typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabAirborne==='function'&&_testLabAirborne(pl);
+      if(!skipSettle) _wheelSettle(pl,{maxUp:20,maxDrop:COLL_LEDGE_STEP+12});
+    }
   }
   _validateGroundFlag(pl);
   if((pl._groundHold||0)<=0) _syncPlayerGroundFlag(pl);
