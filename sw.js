@@ -9,7 +9,7 @@ const SHELL = [
   './js/save.js', './js/core.js', './js/audio.js', './js/enemies.js', './js/physics.js',
   './js/player.js', './js/weapons.js', './js/ui.js', './js/render.js',
   './js/editor.js', './js/spawn_fix.js', './js/awdjoo_level.js', './js/healthwatch.js',
-  './js/awdjoo_map.js', './js/main.js', './js/test_lab.js',
+  './js/awdjoo_map.js', './js/main.js', './js/test_lab.js', './js/debug_overlay.js',
   './js/selftest.js',
 ];
 
