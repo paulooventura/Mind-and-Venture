@@ -980,7 +980,7 @@ function update(){
     const _inJumpAir=!_playerOnGround(p)&&p.hook.st!=='on'&&p.wallGrip<=0;
     if(_inJumpAir&&p.jumpTiltF>0)p.jumpTiltF=Math.max(0,p.jumpTiltF-0.55);else if(p.jumpTiltF>0)p.jumpTiltF=Math.max(0,p.jumpTiltF-2.5);
     if(isJump()&&p.jf>0){p.vy=Math.max(p.vy-JHH,JMX);p.jf--;}else if(!isJump())p.jf=0;
-    if(_grounded&&p.vy>=0) p.vy=0;
+    if(_grounded&&p.vy>=0&&(p.jf||0)<=0) p.vy=0;
     else p.vy=Math.min(p.vy+(isJump()&&p.jf>0&&p.vy<0?GRAV*0.38:GRAV),14);
     if(!_playerOnGround(p)&&p.hook.st!=='on'&&p.wallGrip<=0) p._peakVy=Math.max(p._peakVy||0,p.vy);
     _movePlayerWithColl(p,p.vx,p.vy);

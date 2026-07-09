@@ -676,6 +676,10 @@ function _wheelSettle(pl,opts){
   if(!pl||(pl.hook&&pl.hook.st==='on')||pl.wallGrip>0) return null;
   if(pl._bwallFallGrace>0) return null;
   if(_ridingBwallTop(pl)) return null;
+  if(typeof _testLabMode!=='undefined'&&_testLabMode){
+    if((pl.jf||0)>0||(pl.vy||0)<-0.2) return null;
+    if(!pl.og&&(pl._groundHold||0)<=0) return null;
+  }
   opts=opts||{};
   const feet=pl.y+FEET_OFF;
   const rising=pl.vy<-0.35;
@@ -1497,7 +1501,7 @@ function _haltBlockedMove(pl,x0,y0,vx,vy){
   }
   if(Math.abs(vy)>0.05){
     const moved=Math.abs(dy), expected=Math.abs(vy);
-    if(moved<expected*0.55) pl.vy=0;
+    if(moved<expected*0.55&&!(typeof _testLabMode!=='undefined'&&_testLabMode&&vy<0)) pl.vy=0;
   }
 }
 function _haltVelocityAtContacts(pl){
@@ -2426,6 +2430,8 @@ function healAnyPlayerFromKnowl(pl){
 // ── Ground + spawn helpers ────────────────────────────────────
 function _playerGrounded(pl){
   if(!pl) return false;
+  if(typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabPlayerGrounded==='function')
+    return _testLabPlayerGrounded(pl);
   if(pl.hook&&pl.hook.st==='on') return false;
   if(pl.wallGrip>0) return false;
   if((pl.jf||0)>0) return false;
@@ -2479,6 +2485,7 @@ function measureHeadroom(pl=p){
     if(plat.tp!=='ceil'&&plat.tp!=='solid') continue;
     if(plat.x+plat.w<=fL||plat.x>=fR) continue;
     if(plat.y>=feet-GROUND_SINK_MAX-4) continue;
+    if(typeof _testLabMode!=='undefined'&&_testLabMode&&feet>=plat.y-8&&feet<=plat.y+plat.h+8) continue;
     const ceilB=plat.y+plat.h;
     const gap=ceilB-bodyTop;
     if(gap>=0&&gap<=STAND_H+4&&gap<minGap) minGap=gap;

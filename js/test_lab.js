@@ -251,6 +251,20 @@ function _pushTestLabMovPlats() {
   }
 }
 
+function _testLabPlayerGrounded(pl) {
+  if (!pl || !_testLabMode) return false;
+  if (pl.hook && pl.hook.st === 'on') return false;
+  if (pl.wallGrip > 0) return false;
+  if ((pl.jf || 0) > 0) return false;
+  if ((pl.vy || 0) < -0.45) return false;
+  const feet = pl.y + FEET_OFF;
+  const fL = pl.x + FEET_L, fR = fL + FEET_W;
+  const cx = pl.x + SW * 0.5;
+  const surf = _testLabWalkSurfaceY(cx, feet, 28, fL, fR);
+  if (surf == null) return false;
+  return feet >= surf - LAND_FEET_TOL - 6 && feet <= surf + LAND_FEET_TOL + 10;
+}
+
 function _testLabWalkSurfaceY(cx, feet, landSlop, fL, fR) {
   if (!_testLabMode) return null;
   let best = null;
@@ -272,7 +286,9 @@ function _testLabOnWalkSurface(pl, plat) {
 }
 
 function _testLabSnapLanding(pl) {
-  if (!pl || !_testLabMode || pl.vy < -0.5) return;
+  if (!pl || !_testLabMode) return;
+  if ((pl.jf || 0) > 0) return;
+  if ((pl.vy || 0) < 0) return;
   if (pl.hook && pl.hook.st === 'on') return;
   const feet = pl.y + FEET_OFF;
   const fL = pl.x + FEET_L, fR = fL + FEET_W;
