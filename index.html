@@ -23,7 +23,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Mind &amp; Venture</title>
-<script>window.MV_BUILD='106';</script>
+<script>window.MV_BUILD='107';</script>
 <script>
 if(location.protocol==='file:'){
   document.addEventListener('DOMContentLoaded',function(){
@@ -134,7 +134,7 @@ canvas{image-rendering:auto;
 </style>
 </head>
 <body>
-<div id="mvVer" style="font-size:13px;color:#6f6;font-weight:bold;font-family:monospace;margin:4px 0">Mind &amp; Venture · Awdjoo · build 106</div>
+<div id="mvVer" style="font-size:13px;color:#6f6;font-weight:bold;font-family:monospace;margin:4px 0">Mind &amp; Venture · Awdjoo · build 107</div>
 <div id="battleHud">
   <div class="bh-title">BATTLE PRACTICE</div>
   <div class="bh-row">
@@ -188,23 +188,24 @@ window.onerror=function(msg,src,line,col,err){
 <script src="js/core.js?v=25"></script>
 <script src="js/audio.js?v=25"></script>
 <script src="js/enemies.js?v=33"></script>
-<script src="js/physics.js?v=106"></script>
-<script src="js/player.js?v=106"></script>
+<script src="js/physics.js?v=107"></script>
+<script src="js/player.js?v=107"></script>
 <script src="js/weapons.js?v=27"></script>
-<script src="js/ui.js?v=106"></script>
+<script src="js/ui.js?v=107"></script>
 <script src="js/render.js?v=65"></script>
 <script src="js/editor.js?v=25"></script>
 <script src="js/spawn_fix.js?v=52"></script>
 <script src="js/awdjoo_level.js?v=1"></script>
 <script src="js/healthwatch.js?v=1"></script>
 <script src="js/awdjoo_map.js?v=44"></script>
-<script src="js/main.js?v=106"></script>
+<script src="js/test_lab.js?v=1"></script>
+<script src="js/main.js?v=107"></script>
 <script src="js/debug_overlay.js?v=2"></script>
 <script src="js/selftest.js?v=13"></script>
 <script>
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.addEventListener('load',function(){
-    var SW_BUILD='106';
+    var SW_BUILD='107';
     if(/[?&](selftest|ci)=/i.test(location.search)) return;
     var stored=localStorage.getItem('mv_sw_build');
     if(stored!==SW_BUILD||window.MV_BUILD!==SW_BUILD){

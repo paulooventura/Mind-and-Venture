@@ -91,6 +91,7 @@ function _drawUiToast(){
 function _titleMenuItems(){
   return [
     {label:'STORY MODE', activate:()=>startStoryMode()},
+    {label:'TEST LAB', activate:()=>startTestLab()},
     {label:'TUTORIAL CHAMBER', activate:()=>{_gameState='tutorial';}},
     {label:'BATTLE PRACTICE', activate:()=>startBattleTest()},
     {label:'CREATIVE MODE', locked:!_gameBeaten, activate:()=>{_gameState='stagedesign';_stageDesignSelIdx=0;}},
@@ -355,7 +356,7 @@ function drawHUD(){
   if(_awdjooTutorial&&_zoneIdx===0) drawText('SC:'+_stageScore,188,3,_stageDamageFree?C.MINT:C.SAND);
   const hpSegs=10, hpFill=Math.round(p.hp/p.maxHp*hpSegs);
   for(let i=0;i<hpSegs;i++){ const low=p.hp<=PLAYER_HIT_DMG*2; ctx.fillStyle=i<hpFill?(low&&fr%16<8?C.RED_L:C.RED):C.GREY_D; ctx.fillRect(3+i*4,10,3,1); }
-  if(_battleTestMode||_runTestMode) drawText('HP'+p.hp,28,3,p.hp<=40?C.RED_L:C.WHITE);
+  if(_battleTestMode||_runTestMode||typeof _testLabMode!=='undefined'&&_testLabMode) drawText('HP'+p.hp,28,3,p.hp<=40?C.RED_L:C.WHITE);
   const icols=[C.GREY,C.RED_L,C.SKY,C.LILAC];
   const inames=['TRS','RCA','XLR','MAG'];
   for(let i=0;i<4;i++){
@@ -375,6 +376,7 @@ function drawHUD(){
   drawText('M'+MOVE_BUILD,4,H-10,C.MINT);
   if(_gameState==='game'&&Math.abs(p.vx)>0.3) drawText('SPD'+Math.round(Math.abs(p.vx)),W-58,3,C.WHITE);
   if(_runTestMode){ctx.fillStyle=C.BLACK;ctx.fillRect(W-108,1,106,10);drawText('RUN TEST',W-104,3,C.MINT);ctx.fillStyle=C.BLACK;ctx.fillRect(W-108,12,106,8);const sc=Math.round((p.suspComp||0)*100);drawText('SUSP'+sc+'%  TAB=RESET',W-104,13,C.GREY);}
+  if(typeof _testLabMode!=='undefined'&&_testLabMode){ctx.fillStyle=C.BLACK;ctx.fillRect(W-148,1,146,10);drawText('TEST LAB',W-144,3,C.MINT);ctx.fillStyle=C.BLACK;ctx.fillRect(W-148,12,146,8);drawText('KNOWL '+kColl+'/'+kTotal+'  TAB=RESET',W-144,13,C.GREEN_L);}
   if(GP&&GP.pad) drawText('GP',W-14,3,C.GREEN);
   const prog=Math.max(0,Math.min(1,1-(p.y-360)/WH));
   ctx.fillStyle=C.BLACK;ctx.fillRect(W-2,12,2,H-12);

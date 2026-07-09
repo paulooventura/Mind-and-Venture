@@ -740,8 +740,8 @@ function initRunTestWorld(){
   camX=0; camY=0; _mapReady=true; _allPCache=null;
   console.info('MV: Run test world ready');
 }
-function startBattleTest(){ _unlockAudio(); _battleTestMode=true; _runTestMode=false; _stageDesignerMode=false; _gameState='game'; _stopBGM('title'); _stopBGM('story'); initBattleTestWorld(); _playBGM('game',OPT.musicVol); _syncBattleHud(); }
-function startRunTest(){ _unlockAudio(); _battleTestMode=false; _runTestMode=true; _stageDesignerMode=false; _gameState='game'; _stopBGM('title'); _stopBGM('story'); initRunTestWorld(); _playBGM('game',OPT.musicVol); }
+function startBattleTest(){ _unlockAudio(); _battleTestMode=true; _runTestMode=false; _stageDesignerMode=false; if(typeof _testLabMode!=='undefined') _testLabMode=false; _gameState='game'; _stopBGM('title'); _stopBGM('story'); initBattleTestWorld(); _playBGM('game',OPT.musicVol); _syncBattleHud(); }
+function startRunTest(){ _unlockAudio(); _battleTestMode=false; _runTestMode=true; _stageDesignerMode=false; if(typeof _testLabMode!=='undefined') _testLabMode=false; _gameState='game'; _stopBGM('title'); _stopBGM('story'); initRunTestWorld(); _playBGM('game',OPT.musicVol); }
 
 // ── Zone placeholder (procgen) ────────────────────────────────
 function _buildZonePlaceholder(idx){
@@ -785,6 +785,7 @@ function buildProcgenWorld(seed){
 function initWorld(){
   _clearBattleRespawnTimer();
   _battleTestMode=false; _syncBattleHud(); _runTestMode=false; _stageDesignerMode=false;
+  if(typeof _testLabMode!=='undefined') _testLabMode=false;
   const boot=()=>{
     _ensureCampaignMapApplied();
     ENEMS=[]; CRATES=[]; _restoreMapBWalls(); _resetItemProgress();
@@ -819,11 +820,12 @@ function update(){
   for(const m of MPLAT){m.vx*=0.78;m.x=Math.max(m.minX,Math.min(m.maxX-m.w,m.x+m.vx));}
 
   if(Kj['Tab']){
-    if(_stageDesignerMode){_editorActive=false;_gameState='stagedesign';_stopBGM('game');clkj();return;}
-    win=false;_shutdownTimer=0;_resetItemProgress();
-    if(_battleTestMode) initBattleTestWorld();
-    else if(_runTestMode) initRunTestWorld();
-    else _enterZone(0);
+  if(_stageDesignerMode){_editorActive=false;_gameState='stagedesign';_stopBGM('game');clkj();return;}
+  win=false;_shutdownTimer=0;_resetItemProgress();
+  if(_battleTestMode) initBattleTestWorld();
+  else if(_runTestMode) initRunTestWorld();
+  else if(typeof _testLabMode!=='undefined'&&_testLabMode) initTestLabWorld();
+  else _enterZone(0);
     clkj();return;
   }
   if(win){clkj();return;}
@@ -1045,13 +1047,15 @@ function update(){
   if(!win&&!_battleTestMode&&_zoneIdx===0&&_laitu&&!_laitu.met){
     const h=playerCoreHB(p);const spawnDist=Math.hypot(p.x-_spawnX,p.y-_spawnY);
     if(spawnDist>100&&ov(h.x-4,h.y,h.w+8,h.h,_laitu.x,_laitu.y,_laitu.w,_laitu.h)) _startLaituCutscene();
-  }else if(!win&&goalOpen&&(_zoneIdx>0||_stageDesignerMode||_zoneIdx===0)&&(p1Goal||p2Goal)){
-    if(_stageDesignerMode){edShowToast('GOAL REACHED! TAB to return to hub');sfx('unlock');}
+ }else if(!win&&goalOpen&&(_zoneIdx>0||_stageDesignerMode||_zoneIdx===0||(_testLabMode))&&(p1Goal||p2Goal)){
+  if(typeof _testLabMode!=='undefined'&&_testLabMode){win=true;uiShowToast('TEST LAB CLEAR!');sfx('chargeReady');}
+  else if(_stageDesignerMode){edShowToast('GOAL REACHED! TAB to return to hub');sfx('unlock');}
     else if(_zoneIdx<ZONES.length-1){_enterZone(_zoneIdx+1);sfx('chargeReady');}
     else{win=true;_markGameBeaten();}
   }
-  _tickBattleTestSpawner();
-  if(window.__MV_HEALTH&&typeof window.__MV_HEALTH.tick==='function') window.__MV_HEALTH.tick();
+ _tickBattleTestSpawner();
+ if(typeof _tickTestLabGoals==='function') _tickTestLabGoals();
+ if(window.__MV_HEALTH&&typeof window.__MV_HEALTH.tick==='function') window.__MV_HEALTH.tick();
   clkj(); Object.keys(Kj2).forEach(k=>delete Kj2[k]);
 }
 

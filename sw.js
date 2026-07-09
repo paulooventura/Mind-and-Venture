@@ -1,5 +1,5 @@
 /* Mind & Venture — lightweight PWA shell cache (assets load from network). */
-const CACHE = 'mv-web-v106';
+const CACHE = 'mv-web-v107';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './assets/Awdjoo/Awdjoo.json',
@@ -9,7 +9,7 @@ const SHELL = [
   './js/save.js', './js/core.js', './js/audio.js', './js/enemies.js', './js/physics.js',
   './js/player.js', './js/weapons.js', './js/ui.js', './js/render.js',
   './js/editor.js', './js/spawn_fix.js', './js/awdjoo_level.js', './js/healthwatch.js',
-  './js/awdjoo_map.js', './js/main.js', './js/debug_overlay.js',
+  './js/awdjoo_map.js', './js/main.js', './js/test_lab.js',
   './js/selftest.js',
 ];
 
