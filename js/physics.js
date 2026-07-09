@@ -1216,6 +1216,30 @@ function resolvePlatY(pl,prevFeet){
   const landSlop=Math.max(12,Math.abs(pl.vy)+10);
   if(pl.vy>=0){
     const cx=pl.x+SW*0.5;
+    if(typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabWalkSurfaceY==='function'){
+      const tlSurf=_testLabWalkSurfaceY(cx,feet,landSlop,fL,fR);
+      if(tlSurf!=null&&_feetCanLandOn(feet,prevFeet,tlSurf)){
+        if(pl.hook&&pl.hook.st==='on') return;
+        const landVy=pl.vy, impactVy=Math.max(landVy,pl._peakVy||0);
+        pl._peakVy=0;
+        pl.y=tlSurf-FEET_OFF;
+        pl.vy=0;
+        pl.og=true;
+        pl._autoHeadTuck=0;
+        pl._groundSeg=null;
+        pl._slopeAngle=0;
+        pl._onSlope=false;
+        if(!wasOg&&(pl._groundHold||0)<=0){
+          const landAmp=Math.min(1,Math.max(0.22,impactVy/10));
+          pl._landAmp=landAmp;
+          pl.landF=Math.round(10+landAmp*22);
+          pl.jumpTiltF=0;
+          if(pl===p&&!(pl.hook&&pl.hook.st==='on')) sfx('land');
+        }
+        pl._groundHold=10;
+        return;
+      }
+    }
     let bestTop=null, landSeg=null, landAng=0;
     const marioTop=_marioWalkTopY(pl,feet,fL,fR,landSlop,prevFeet);
     if(marioTop!=null){
@@ -1239,7 +1263,7 @@ function resolvePlatY(pl,prevFeet){
         if(feet>plat.y+plat.h) continue;
         if(bestTop===null||plat.y<bestTop) bestTop=plat.y;
       }
-      if(bestTop!==null){
+      if(bestTop!==null&&!(typeof _testLabMode!=='undefined'&&_testLabMode)){
         const wSup=_wheelSupportAt(cx,feet,{maxUp:landSlop+12,maxDrop:landSlop+56,pl});
         if(!wSup||wSup.frac<WHEEL_MIN_SUPPORT||Math.abs(wSup.y-bestTop)>12) bestTop=null;
       }
@@ -1289,6 +1313,7 @@ function resolvePlatY(pl,prevFeet){
     }else if(plat.tp==='solid'||plat.tp==='ceil'){
       if(plat.bw&&_playerRidingBoxTop(pl,plat)) continue;
       if(!_platNearX(plat,pl.x+SW*0.5,SW+32)) continue;
+      if(typeof _testLabMode!=='undefined'&&_testLabMode&&feet>=plat.y-8&&feet<=plat.y+plat.h+8) continue;
       const useBodyCeil=_useBodyCeilCollider(pl);
       const body=playerCoreHB(pl);
       const head=playerHeadWorld(pl);
@@ -1350,6 +1375,7 @@ function _headroomAboveBody(pl){
     if(plat.tp!=='solid'&&plat.tp!=='ceil') continue;
     if(plat.x+plat.w<=fL||plat.x>=fR) continue;
     if(plat.y>=feet-GROUND_SINK_MAX-4) continue;
+    if(typeof _testLabMode!=='undefined'&&_testLabMode&&feet>=plat.y-8&&feet<=plat.y+plat.h+8) continue;
     const ceilB=plat.y+plat.h;
     const gap=ceilB-bodyTop;
     if(gap>=0&&gap<minGap) minGap=gap;
@@ -1417,6 +1443,7 @@ function _resolveHeadCeiling(pl){
     if(plat.tp!=='ceil'&&plat.tp!=='solid') continue;
     if(plat.bw&&_playerRidingBoxTop(pl,plat)) continue;
     if(!_platNearX(plat,cx,SW+24)) continue;
+    if(typeof _testLabMode!=='undefined'&&_testLabMode&&feet>=plat.y-8&&feet<=plat.y+plat.h+8) continue;
     if(useBody){
       if(fR<=plat.x||fL>=plat.x+plat.w) continue;
       if(bumpDown(plat.y+plat.h)) hit=true;
@@ -1545,6 +1572,7 @@ function _movePlayerWithColl(pl,vx,vy){
   if(pl===p&&typeof _moveInputX==='function'&&_moveInputX()) _cornerStepResolve(pl);
   _marioEjectFromSolids(pl);
   pl._prevLandFeet=pl.y+FEET_OFF;
+  if(typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabSnapLanding==='function') _testLabSnapLanding(pl);
 }
 
 // ── Actor (enemy) physics ─────────────────────────────────────

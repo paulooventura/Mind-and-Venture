@@ -9,7 +9,7 @@ let _testLabMode = false;
 const TL_PT = 32;
 const TL_WALL = 32;
 const TL_FLOOR_Y = 528;
-const TL_FLOOR_H = 64;
+const TL_FLOOR_H = TL_PT;
 const TL_WW = 4800;
 const TL_WH = 800;
 const TL_MIN_TREAD = 96;
@@ -28,18 +28,22 @@ function _tlBounds() {
   ];
 }
 
-// Zone A — downhill sprint runway (wide treads, 32px thick)
+// Zone 0 — flat spawn runway (main floor only; downhill starts later)
+const TL_SPAWN_RUN = 640;
+const TL_DOWNHILL_START = 640;
+
+// Zone A — downhill treads ON the main floor (32px steps; gaps fall to floor)
 function _tlDownhill() {
   const out = [];
-  let x = 64;
-  let top = 360;
-  const endX = 2240;
-  const stepW = 120;
-  const stepDrop = 28;
-  const cap = TL_FLOOR_Y - TL_PT;
-  while (x < endX && top <= cap) {
+  let x = TL_DOWNHILL_START;
+  let top = TL_FLOOR_Y - TL_PT - 128;
+  const endX = 2280;
+  const stepW = 144;
+  const stepDrop = 32;
+  const floorTop = TL_FLOOR_Y - TL_PT;
+  while (x < endX && top < floorTop) {
     out.push(_tlRect(x, top, stepW, TL_PT));
-    x += stepW - 20;
+    x += stepW - 28;
     top += stepDrop;
   }
   return out;
@@ -61,7 +65,7 @@ function _tlJumpGauntlet() {
 
 // Zone C — vertical climb shaft (wide bay, thick ledges)
 function _tlVerticalShaft() {
-  const shaftL = 2480;
+  const shaftL = 3400;
   const shaftW = 192;
   const shaftTop = 96;
   const shaftBot = TL_FLOOR_Y - TL_PT;
@@ -247,32 +251,124 @@ function _pushTestLabMovPlats() {
   }
 }
 
+function _testLabWalkSurfaceY(cx, feet, landSlop, fL, fR) {
+  if (!_testLabMode) return null;
+  let best = null;
+  for (const plat of allP()) {
+    if (plat.tp !== 'solid' && plat.tp !== 'oneway') continue;
+    if (fR <= plat.x || fL >= plat.x + plat.w) continue;
+    const top = plat.y;
+    if (feet < top - landSlop - 8) continue;
+    if (feet > top + COLL_LEDGE_STEP + 24) continue;
+    if (best === null || top < best) best = top;
+  }
+  return best;
+}
+
+function _testLabOnWalkSurface(pl, plat) {
+  if (!pl || !plat) return false;
+  const feet = pl.y + FEET_OFF;
+  return feet >= plat.y - 10 && feet <= plat.y + plat.h + 8;
+}
+
+function _testLabSnapLanding(pl) {
+  if (!pl || !_testLabMode || pl.vy < -0.5) return;
+  if (pl.hook && pl.hook.st === 'on') return;
+  const feet = pl.y + FEET_OFF;
+  const fL = pl.x + FEET_L, fR = fL + FEET_W;
+  const cx = pl.x + SW * 0.5;
+  const landSlop = Math.max(14, Math.abs(pl.vy || 0) + 12);
+  const surf = _testLabWalkSurfaceY(cx, feet, landSlop, fL, fR);
+  if (surf == null) return;
+  if (feet < surf - 4 || feet > surf + COLL_LEDGE_STEP + 16) return;
+  pl.y = surf - FEET_OFF;
+  if (pl.vy > 0) pl.vy = 0;
+  pl.og = true;
+  pl._autoHeadTuck = 0;
+  pl._groundHold = Math.max(pl._groundHold || 0, 10);
+}
+
 function _testLabUnstick(pl) {
   if (!pl || !_testLabMode) return;
   const body = playerCoreHB(pl);
   const feet = pl.y + FEET_OFF;
   const cx = pl.x + SW * 0.5;
+  const hr = measureHeadroom(pl);
+  const wedged = hr < STAND_H - 4 && (!_playerOnGround(pl) || (pl._autoHeadTuck || 0) > 0.35);
   let popped = false;
 
-  for (const plat of allP()) {
-    if (plat.tp !== 'solid' || plat.poly) continue;
-    if (cx < plat.x - 12 || cx > plat.x + plat.w + 12) continue;
-    if (!ov(body.x, body.y, body.w, body.h, plat.x, plat.y, plat.w, plat.h)) continue;
-    if (feet <= plat.y + 6) continue;
-    if (feet > plat.y + plat.h + 32) continue;
-    pl.y = plat.y - FEET_OFF;
-    pl.vy = 0;
-    pl.og = true;
-    pl._autoHeadTuck = 0;
-    pl._groundHold = 10;
-    popped = true;
-    break;
-  }
-  if (popped) return;
+  if (wedged) pl._testLabStuck = (pl._testLabStuck || 0) + 1;
+  else pl._testLabStuck = 0;
 
-  const hr = measureHeadroom(pl);
-  if (!_playerOnGround(pl) && hr < STAND_H - 6) {
-    const surf = typeof _surfaceYAt === 'function' ? _surfaceYAt(cx, feet + 16, 140) : null;
+  const inFloorSlab = ov(body.x, body.y, body.w, body.h, 0, TL_FLOOR_Y, TL_WW, TL_FLOOR_H)
+    && feet > TL_FLOOR_Y + 6 && feet < TL_FLOOR_Y + TL_FLOOR_H - 4;
+
+  const pickTop = () => {
+    let best = null;
+    const samples = [cx - FEET_W * 0.25, cx, cx + FEET_W * 0.25];
+    for (const plat of allP()) {
+      if (plat.tp !== 'solid' || plat.poly) continue;
+      let span = false;
+      for (const sx2 of samples) {
+        if (sx2 >= plat.x - 4 && sx2 <= plat.x + plat.w + 4) { span = true; break; }
+      }
+      if (!span) continue;
+      if (feet > plat.y + 8 && feet < plat.y + plat.h + 48) {
+        if (best === null || plat.y < best) best = plat.y;
+      }
+    }
+    if (best !== null) return best;
+    return typeof _pickWalkSurfaceY === 'function'
+      ? _pickWalkSurfaceY(cx, feet, { maxUp: 96, maxDrop: 220, pl })
+      : (typeof _surfaceYAt === 'function' ? _surfaceYAt(cx, feet + 24, 220) : null);
+  };
+
+  if (wedged || inFloorSlab) {
+    const top = pickTop();
+    if (top != null && feet > top + 2) {
+      pl.y = top - FEET_OFF;
+      pl.vy = 0;
+      pl.vx *= 0.65;
+      pl.og = true;
+      pl._autoHeadTuck = 0;
+      pl._groundHold = 12;
+      popped = true;
+    }
+  }
+
+  if (!popped) {
+    for (const plat of allP()) {
+      if (plat.tp !== 'solid' || plat.poly) continue;
+      if (cx < plat.x - 16 || cx > plat.x + plat.w + 16) continue;
+      if (!ov(body.x, body.y, body.w, body.h, plat.x, plat.y, plat.w, plat.h)) continue;
+      if (feet <= plat.y + 8) continue;
+      if (feet > plat.y + plat.h + 40) continue;
+      pl.y = plat.y - FEET_OFF;
+      pl.vy = 0;
+      pl.og = true;
+      pl._autoHeadTuck = 0;
+      pl._groundHold = 12;
+      popped = true;
+      break;
+    }
+  }
+
+  if (!popped && (pl._testLabStuck || 0) > 18) {
+    const top = pickTop();
+    if (top != null) {
+      pl.y = top - FEET_OFF;
+      pl.vy = 0;
+      pl.vx = 0;
+      pl.og = true;
+      pl._autoHeadTuck = 0;
+      pl._groundHold = 14;
+      pl._testLabStuck = 0;
+      popped = true;
+    }
+  }
+
+  if (!popped && wedged) {
+    const surf = typeof _surfaceYAt === 'function' ? _surfaceYAt(cx, feet + 32, 200) : null;
     if (surf != null && feet > surf + 4) {
       pl.y = surf - FEET_OFF;
       pl.vy = 0;
@@ -280,9 +376,12 @@ function _testLabUnstick(pl) {
       pl._autoHeadTuck = 0;
       pl._groundHold = 10;
     }
-  } else if (_playerOnGround(pl) && pl._autoHeadTuck > 0.5 && hr >= STAND_H - 4) {
+  } else if (_playerOnGround(pl) && (pl._autoHeadTuck || 0) > 0.4 && hr >= STAND_H - 4) {
     pl._autoHeadTuck = 0;
   }
+
+  if (typeof _marioEjectFromSolids === 'function') _marioEjectFromSolids(pl);
+  if (typeof _recoverFromInterior === 'function') _recoverFromInterior(pl);
 }
 
 function initTestLabWorld() {
@@ -320,8 +419,8 @@ function initTestLabWorld() {
   _zoneIdx = _testLabZoneIdx();
   _zoneCardT = 220;
 
-  _spawnX = 64;
-  _spawnY = TEST_LAB_FLOOR - FEET_OFF;
+  _spawnX = 200;
+  _spawnY = TL_FLOOR_Y - FEET_OFF;
   p = mkP();
   p.x = _spawnX;
   p.y = _spawnY;
@@ -330,9 +429,15 @@ function initTestLabWorld() {
   p.og = true;
   p.hp = p.maxHp;
   p._autoHeadTuck = 0;
+  p._testLabStuck = 0;
   _syncLivesFromHp(p);
   _grantTestLabItems(p);
-  if (typeof _resolveSpawnPlacement === 'function') _resolveSpawnPlacement(p);
+  _testLabUnstick(p);
+  if (!_playerOnGround(p)) {
+    p.y = TL_FLOOR_Y - FEET_OFF;
+    p.og = true;
+    p._autoHeadTuck = 0;
+  }
 
   camX = 0;
   camY = 0;
@@ -346,14 +451,15 @@ function initTestLabWorld() {
 function startTestLab() {
   _unlockAudio();
   _gameState = 'game';
-  _stopBGM('title');
-  _stopBGM('story');
+  if (typeof _stopAllBgm === 'function') _stopAllBgm();
+  else { _stopBGM('title'); _stopBGM('story'); _stopBGM('game'); }
   initTestLabWorld();
   _playBGM('game', OPT.musicVol);
 }
 
 function _tickTestLabGoals() {
   if (!_testLabMode || _gameState !== 'game' || !p) return;
+  _testLabSnapLanding(p);
   _testLabUnstick(p);
-  if (p2) _testLabUnstick(p2);
+  if (p2) { _testLabSnapLanding(p2); _testLabUnstick(p2); }
 }
