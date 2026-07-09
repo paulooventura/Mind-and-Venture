@@ -20,7 +20,7 @@ function _tlRect(x, y, w, h, tp) {
 
 function _tlBounds() {
   return [
-    _tlRect(0, TL_FLOOR_Y, TL_WW, TL_FLOOR_H),
+    _tlRect(0, TL_FLOOR_Y, TL_WW, TL_FLOOR_H, 'oneway'),
     _tlRect(0, 0, TL_WW, TL_WALL),
     _tlRect(0, 0, TL_WALL, TL_WH),
     _tlRect(TL_WW - TL_WALL, 0, TL_WALL, TL_WH),
@@ -42,7 +42,7 @@ function _tlDownhill() {
   const stepDrop = 32;
   const floorTop = TL_FLOOR_Y - TL_PT;
   while (x < endX && top < floorTop) {
-    out.push(_tlRect(x, top, stepW, TL_PT));
+    out.push(_tlRect(x, top, stepW, TL_PT, 'oneway'));
     x += stepW - 28;
     top += stepDrop;
   }
@@ -318,6 +318,56 @@ function _testLabSnapLanding(pl) {
   pl._groundHold = Math.max(pl._groundHold || 0, 10);
 }
 
+function _testLabMovePlayer(pl, vx, vy) {
+  if (!pl || !_testLabMode) {
+    _movePlayerWithColl(pl, vx, vy);
+    return;
+  }
+  const x0 = pl.x, y0 = pl.y;
+  pl.x += vx;
+  if (pl.x < 0) { pl.x = 0; pl.vx = 0; }
+  if (pl.x > WW - SW) { pl.x = WW - SW; pl.vx = 0; }
+  resolveBodyX(pl);
+
+  const prevFeet = pl.y + FEET_OFF;
+  pl.y += vy;
+  const feet = pl.y + FEET_OFF;
+  const fL = pl.x + FEET_L, fR = fL + FEET_W;
+  const cx = pl.x + SW * 0.5;
+
+  if (vy < 0) {
+    pl.og = false;
+    pl._groundHold = 0;
+    const body = playerCoreHB(pl);
+    for (const plat of allP()) {
+      if (plat.tp !== 'solid' && plat.tp !== 'ceil') continue;
+      if (feet >= plat.y - 6) continue;
+      if (body.x + body.w <= plat.x || body.x >= plat.x + plat.w) continue;
+      const ceilB = plat.y + plat.h;
+      if (body.y < ceilB && body.y + body.h > plat.y + 2) {
+        pl.y += ceilB - body.y;
+        if (pl.vy < 0) pl.vy = 0;
+      }
+    }
+  } else {
+    const landSlop = Math.max(12, Math.abs(pl.vy || 0) + 10);
+    const surf = _testLabWalkSurfaceY(cx, feet, landSlop, fL, fR);
+    if (surf != null && typeof _feetCanLandOn === 'function' && _feetCanLandOn(feet, prevFeet, surf)) {
+      pl.y = surf - FEET_OFF;
+      if (pl.vy > 0) pl.vy = 0;
+      pl.og = true;
+      pl._autoHeadTuck = 0;
+      pl._groundHold = 10;
+    } else if ((pl.vy || 0) > 0.5) {
+      pl.og = false;
+    }
+  }
+
+  if (typeof _haltVelocityAtContacts === 'function') _haltVelocityAtContacts(pl);
+  if (typeof _haltBlockedMove === 'function') _haltBlockedMove(pl, x0, y0, vx, vy);
+  pl._prevLandFeet = pl.y + FEET_OFF;
+}
+
 function _testLabUnstick(pl) {
   if (!pl || !_testLabMode) return;
   if (_testLabAirborne(pl)) return;
@@ -490,7 +540,63 @@ function startTestLab() {
 
 function _tickTestLabGoals() {
   if (!_testLabMode || _gameState !== 'game' || !p) return;
-  _testLabSnapLanding(p);
+  if (!_testLabAirborne(p)) _testLabSnapLanding(p);
   _testLabUnstick(p);
-  if (p2) { _testLabSnapLanding(p2); _testLabUnstick(p2); }
+  if (p2) {
+    if (!_testLabAirborne(p2)) _testLabSnapLanding(p2);
+    _testLabUnstick(p2);
+  }
 }
+
+(function _bootTestLabJumpCI() {
+  if (!/[?&]testlabci=1/i.test(location.search)) return;
+  var armed = false, frame = 0, y0 = null, minY = null, jumpCode = 'Space';
+  function jumpKey() {
+    try {
+      if (typeof OPT !== 'undefined' && OPT.binds && OPT.binds.jump && OPT.binds.jump[0])
+        return OPT.binds.jump[0];
+    } catch (e) {}
+    return 'Space';
+  }
+  function tick() {
+    if (window.__MV_TESTLAB_CI__) return;
+    if (typeof startTestLab !== 'function' || typeof update !== 'function') {
+      requestAnimationFrame(tick);
+      return;
+    }
+    if (!armed) {
+      armed = true;
+      jumpCode = jumpKey();
+      if (typeof _unlockAudio === 'function') _unlockAudio();
+      startTestLab();
+      requestAnimationFrame(tick);
+      return;
+    }
+    if (typeof _gameState === 'undefined' || _gameState !== 'game' || typeof p === 'undefined' || !p) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    if (y0 == null) { y0 = p.y; minY = p.y; }
+    minY = Math.min(minY, p.y);
+    if (frame % 24 === 0) { Kj[jumpCode] = true; K[jumpCode] = true; }
+    if (frame % 24 === 8) K[jumpCode] = false;
+    frame++;
+    if (frame < 150) { requestAnimationFrame(tick); return; }
+    var lift = y0 - minY;
+    var ok = lift >= 18 && minY <= y0 - 12;
+    window.__MV_TESTLAB_CI__ = {
+      ok: ok,
+      lift: Math.round(lift),
+      y0: Math.round(y0),
+      minY: Math.round(minY),
+      vy: +(p.vy || 0).toFixed(2),
+      og: !!p.og,
+      build: window.MV_BUILD || '?',
+      frames: frame
+    };
+    console.log('MV_TESTLAB_CI ' + JSON.stringify(window.__MV_TESTLAB_CI__));
+    document.title = ok ? 'TEST LAB JUMP OK' : 'TEST LAB JUMP FAIL';
+  }
+  if (document.readyState === 'complete') requestAnimationFrame(tick);
+  else window.addEventListener('load', function () { requestAnimationFrame(tick); });
+})();

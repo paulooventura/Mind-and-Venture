@@ -983,7 +983,8 @@ function update(){
     if(_grounded&&p.vy>=0&&(p.jf||0)<=0) p.vy=0;
     else p.vy=Math.min(p.vy+(isJump()&&p.jf>0&&p.vy<0?GRAV*0.38:GRAV),14);
     if(!_playerOnGround(p)&&p.hook.st!=='on'&&p.wallGrip<=0) p._peakVy=Math.max(p._peakVy||0,p.vy);
-    _movePlayerWithColl(p,p.vx,p.vy);
+    if(typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabMovePlayer==='function') _testLabMovePlayer(p,p.vx,p.vy);
+    else _movePlayerWithColl(p,p.vx,p.vy);
     const _moveRaw=_moveInputX();
     const _moveSign=_moveRaw>0.05?1:(_moveRaw<-0.05?-1:0);
     if(_moveSign&&_playerOnGround(p)){

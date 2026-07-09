@@ -2055,6 +2055,7 @@ function _stabilizePlayerCollision(pl){
   if(!pl) return;
   if(pl.hook&&pl.hook.st==='on') return;
   if(pl.wallGrip>0) return;
+  if(typeof _testLabMode!=='undefined'&&_testLabMode&&typeof _testLabAirborne==='function'&&_testLabAirborne(pl)) return;
   if(pl._bwallFallGrace>0) pl._bwallFallGrace--;
   _handleBwallRideRelease(pl);
   const riding=_ridingBwallTop(pl);
